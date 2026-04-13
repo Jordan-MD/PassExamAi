@@ -1,0 +1,41 @@
+[project]
+name = "passexamai-backend"
+version = "0.1.0"
+description = "Backend pour PassExamAI"
+requires-python = ">=3.12"
+dependencies = [
+    # Web framework
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    # Data validation
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    # Supabase
+    "supabase>=2.5.0",
+    # Auth
+    "python-jose[cryptography]>=3.3.0",
+    # AI / LLM
+    "litellm>=1.40.0",
+    "llama-index>=0.10.50",
+    "llama-index-vector-stores-supabase>=0.1.3",
+    "llama-parse>=0.4.9",
+    # Web search
+    "tavily-python>=0.3.3",
+    "firecrawl-py>=0.0.16",
+    # Document processing (fallback)
+    "pymupdf>=1.24.0",
+    # HTTP client
+    "httpx>=0.27.0",
+    # Utilities
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0.0",
+    "tenacity>=8.3.0",   # retry logic
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# AJOUTE CE BLOC ICI POUR FIXER L'ERREUR HATCHLING
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

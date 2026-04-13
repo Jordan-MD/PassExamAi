@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PassExamAI – Exam Revision Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#080B12;
+  --bg-surf:#0F1420;
+  --bg-card:#161D2E;
+  --bg-raise:#1C2438;
+  --border:rgba(255,255,255,0.07);
+  --border-md:rgba(255,255,255,0.12);
+  --border-act:rgba(255,255,255,0.2);
+  --primary:#4F7EF5;
+  --primary-dim:rgba(79,126,245,0.12);
+  --primary-mid:rgba(79,126,245,0.25);
+  --accent:#F5A623;
+  --accent-dim:rgba(245,166,35,0.12);
+  --success:#22C55E;
+  --success-dim:rgba(34,197,94,0.1);
+  --danger:#EF4444;
+  --danger-dim:rgba(239,68,68,0.1);
+  --warn:#F59E0B;
+  --txt:#EDF0FF;
+  --txt-muted:#8A93B0;
+  --txt-sub:#4F5875;
+  --radius:10px;
+  --radius-lg:16px;
+  --radius-xl:24px;
+  --sidebar-w:240px;
+  --header-h:64px;
+  --font-display:'Crimson Pro',Georgia,serif;
+  --font-body:'DM Sans',-apple-system,sans-serif;
+  --font-mono:'DM Mono',monospace;
+}
+html{font-size:16px;scroll-behavior:smooth}
+body{font-family:var(--font-body);background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+#root{display:flex;min-height:100vh}
+::selection{background:var(--primary-mid);color:var(--txt)}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-md);border-radius:99px}
+::-webkit-scrollbar-thumb:hover{background:var(--border-act)}
+
+/* Utility */
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.fade-up{animation:fadeUp .4s ease both}
+.fade-in{animation:fadeIn .3s ease both}
+
+/* Layout */
+.app-shell{display:flex;width:100%;min-height:100vh}
+.sidebar{width:var(--sidebar-w);min-height:100vh;background:var(--bg-surf);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;z-index:100;transition:transform .3s ease}
+.sidebar-logo{padding:20px 20px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border)}
+.logo-icon{width:32px;height:32px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0}
+.logo-text{font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--txt);letter-spacing:-.3px}
+.sidebar-nav{flex:1;padding:12px 10px;overflow-y:auto}
+.nav-section-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--txt-sub);padding:8px 10px 4px;margin-top:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--radius);cursor:pointer;color:var(--txt-muted);font-size:14px;font-weight:500;transition:all .15s;position:relative;text-decoration:none;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:var(--bg-card);color:var(--txt)}
+.nav-item.active{background:var(--primary-dim);color:var(--primary)}
+.nav-item .nav-icon{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-badge{margin-left:auto;font-size:11px;background:var(--primary-dim);color:var(--primary);padding:2px 7px;border-radius:99px;font-weight:600}
+.sidebar-footer{padding:12px 10px;border-top:1px solid var(--border)}
+.sidebar-user{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius);cursor:pointer}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#fff;flex-shrink:0}
+.user-info{flex:1;min-width:0}
+.user-name{font-size:13px;font-weight:600;color:var(--txt);line-height:1.2}
+.user-role{font-size:11px;color:var(--txt-muted);line-height:1.2}
+
+/* Main area */
+.main-content{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;min-height:100vh;transition:margin .3s ease}
+.top-bar{height:var(--header-h);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 28px;gap:16px;background:var(--bg);position:sticky;top:0;z-index:50}
+.top-bar-title{font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--txt);flex:1}
+.top-bar-actions{display:flex;align-items:center;gap:10px}
+.page{flex:1;padding:28px;overflow-x:hidden}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:var(--radius);font-family:var(--font-body);font-size:14px;font-weight:500;cursor:pointer;transition:all .15s;border:none;text-decoration:none;white-space:nowrap}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{filter:brightness(1.1);transform:translateY(-1px)}
+.btn-primary:active{transform:translateY(0)}
+.btn-outline{background:transparent;color:var(--txt-muted);border:1px solid var(--border-md)}
+.btn-outline:hover{border-color:var(--border-act);color:var(--txt);background:var(--bg-card)}
+.btn-ghost{background:transparent;color:var(--txt-muted);border:none}
+.btn-ghost:hover{color:var(--txt);background:var(--bg-card)}
+.btn-danger{background:var(--danger-dim);color:var(--danger);border:1px solid rgba(239,68,68,0.2)}
+.btn-danger:hover{background:rgba(239,68,68,0.2)}
+.btn-success{background:var(--success-dim);color:var(--success);border:1px solid rgba(34,197,94,0.2)}
+.btn-lg{padding:12px 24px;font-size:15px}
+.btn-sm{padding:6px 12px;font-size:13px}
+.btn-icon{width:36px;height:36px;padding:0;justify-content:center;border-radius:var(--radius)}
+.btn:disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+
+/* Cards */
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px}
+.card-hover{transition:border-color .2s,transform .2s;cursor:pointer}
+.card-hover:hover{border-color:var(--border-md);transform:translateY(-2px)}
+.card-section{margin-bottom:20px}
+.card-section:last-child{margin-bottom:0}
+
+/* Inputs */
+.input{width:100%;background:var(--bg-surf);border:1px solid var(--border-md);border-radius:var(--radius);padding:10px 14px;font-family:var(--font-body);font-size:14px;color:var(--txt);outline:none;transition:border-color .15s}
+.input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-dim)}
+.input::placeholder{color:var(--txt-sub)}
+.label{font-size:13px;font-weight:500;color:var(--txt-muted);margin-bottom:6px;display:block}
+.form-group{margin-bottom:16px}
+textarea.input{resize:vertical;min-height:80px;line-height:1.6}
+
+/* Badge / Pill */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:500}
+.badge-primary{background:var(--primary-dim);color:var(--primary)}
+.badge-success{background:var(--success-dim);color:var(--success)}
+.badge-warning{background:rgba(245,166,35,0.12);color:var(--accent)}
+.badge-danger{background:var(--danger-dim);color:var(--danger)}
+.badge-neutral{background:var(--bg-raise);color:var(--txt-muted)}
+
+/* Progress bar */
+.progress-bar{height:6px;background:var(--bg-raise);border-radius:99px;overflow:hidden}
+.progress-fill{height:100%;background:var(--primary);border-radius:99px;transition:width .5s ease}
+.progress-fill.success{background:var(--success)}
+.progress-fill.accent{background:var(--accent)}
+
+/* Divider */
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0}
+
+/* Chapter/Exercise status */
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.status-dot.complete{background:var(--success)}
+.status-dot.active{background:var(--primary);box-shadow:0 0 0 3px var(--primary-dim)}
+.status-dot.locked{background:var(--txt-sub)}
+
+/* Chat */
+.chat-wrap{display:flex;flex-direction:column;gap:16px;padding-bottom:12px}
+.chat-bubble{max-width:85%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.65;animation:fadeUp .3s ease}
+.chat-user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:4px}
+.chat-ai{align-self:flex-start;background:var(--bg-raise);color:var(--txt);border-bottom-left-radius:4px;border:1px solid var(--border)}
+.chat-typing span{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--txt-muted);margin:0 2px;animation:pulse 1.2s ease-in-out infinite}
+.chat-typing span:nth-child(2){animation-delay:.2s}
+.chat-typing span:nth-child(3){animation-delay:.4s}
+.chat-input-row{display:flex;gap:10px;padding-top:12px;border-top:1px solid var(--border)}
+.source-cite{font-size:11px;color:var(--primary);background:var(--primary-dim);padding:2px 8px;border-radius:4px;margin-top:6px;display:inline-block;cursor:pointer}
+
+/* MCQ */
+.choice{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:var(--radius);border:1px solid var(--border-md);cursor:pointer;transition:all .15s;margin-bottom:8px;font-size:14px}
+.choice:hover{border-color:var(--border-act);background:var(--bg-raise)}
+.choice.selected{border-color:var(--primary);background:var(--primary-dim);color:var(--primary)}
+.choice.correct{border-color:var(--success);background:var(--success-dim);color:var(--success)}
+.choice.wrong{border-color:var(--danger);background:var(--danger-dim);color:var(--danger)}
+.choice-label{width:26px;height:26px;border-radius:50%;border:1.5px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0}
+
+/* Exam timer */
+.timer{font-family:var(--font-mono);font-size:20px;font-weight:500;color:var(--accent);letter-spacing:.05em}
+.timer.warning{color:var(--danger);animation:pulse 1s ease-in-out infinite}
+
+/* Stats/Score */
+.score-ring{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.score-ring svg{transform:rotate(-90deg)}
+.score-ring .score-label{position:absolute;text-align:center}
+.score-ring .score-num{font-family:var(--font-display);font-size:36px;font-weight:700;color:var(--txt)}
+.score-ring .score-pct{font-size:13px;color:var(--txt-muted)}
+.stat-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.stat-row:last-child{border-bottom:none}
+
+/* Upload drop zone */
+.dropzone{border:2px dashed var(--border-act);border-radius:var(--radius-lg);padding:48px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg-surf)}
+.dropzone:hover,.dropzone.drag{border-color:var(--primary);background:var(--primary-dim)}
+.dropzone-icon{font-size:40px;margin-bottom:12px;display:block}
+.dropzone h3{font-family:var(--font-display);font-size:20px;margin-bottom:6px;color:var(--txt)}
+.dropzone p{font-size:13px;color:var(--txt-muted)}
+
+/* Roadmap */
+.roadmap-item{display:flex;align-items:flex-start;gap:16px;padding:16px 0}
+.roadmap-connector{display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.roadmap-node{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0;border:2px solid;transition:all .2s}
+.roadmap-node.done{background:var(--success);border-color:var(--success);color:#fff}
+.roadmap-node.current{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
+.roadmap-node.locked{background:var(--bg-raise);border-color:var(--border-md);color:var(--txt-sub)}
+.roadmap-line{width:2px;flex:1;background:var(--border);min-height:24px}
+.roadmap-body{flex:1;padding-bottom:24px}
+.importance-bar{height:4px;border-radius:99px;background:var(--bg-raise);width:80px;overflow:hidden;margin-top:4px;display:inline-block}
+.importance-fill{height:100%;border-radius:99px;background:var(--accent)}
+
+/* Responsive */
+.mobile-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:var(--radius);border:1px solid var(--border-md);background:transparent;cursor:pointer;color:var(--txt-muted)}
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main-content{margin-left:0}
+  .mobile-menu-btn{display:flex}
+  .page{padding:16px}
+  .top-bar{padding:0 16px}
+  .grid-3{grid-template-columns:1fr!important}
+  .grid-2{grid-template-columns:1fr!important}
+  .study-layout{flex-direction:column!important}
+  .chapter-tutor{max-width:100%!important;width:100%!important}
+}
+@media(max-width:1100px){
+  .grid-3{grid-template-columns:repeat(2,1fr)!important}
+}
+
+/* Grid helpers */
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media(max-width:900px){.grid-4{grid-template-columns:repeat(2,1fr)}}
+
+/* Landing specific */
+.landing-hero{display:flex;flex-direction:column;align-items:center;text-align:center;padding:80px 24px;max-width:760px;margin:0 auto}
+.hero-eyebrow{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);margin-bottom:16px;background:var(--primary-dim);padding:4px 14px;border-radius:99px;display:inline-block}
+.hero-title{font-family:var(--font-display);font-size:clamp(40px,6vw,68px);font-weight:700;line-height:1.1;color:var(--txt);margin-bottom:20px;letter-spacing:-.5px}
+.hero-title span{color:var(--primary)}
+.hero-sub{font-size:17px;color:var(--txt-muted);line-height:1.7;margin-bottom:36px;max-width:540px}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;padding:0 24px;max-width:900px;margin:0 auto 60px}
+.feature-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;text-align:left}
+.feature-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;font-size:18px}
+.feature-card h3{font-family:var(--font-display);font-size:17px;font-weight:600;margin-bottom:6px;color:var(--txt)}
+.feature-card p{font-size:13px;color:var(--txt-muted);line-height:1.6}
+.flow-steps{display:flex;align-items:center;justify-content:center;gap:0;margin:40px 24px;flex-wrap:wrap}
+.flow-step{display:flex;flex-direction:column;align-items:center;gap:6px;padding:0 20px}
+.flow-step-num{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.flow-step-label{font-size:12px;color:var(--txt-muted);white-space:nowrap}
+.flow-arrow{color:var(--txt-sub);font-size:18px;margin:0 -8px}
+.auth-card{max-width:420px;width:100%;margin:0 auto}
+.auth-tab{flex:1;padding:10px;text-align:center;font-size:14px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--txt-muted);transition:all .15s}
+.auth-tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.auth-divider{display:flex;align-items:center;gap:12px;margin:20px 0;color:var(--txt-sub);font-size:13px}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.skeleton{background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-raise) 50%,var(--bg-card) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:var(--radius)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px)}
+.modal{background:var(--bg-card);border:1px solid var(--border-md);border-radius:var(--radius-xl);padding:28px;width:100%;max-width:480px;animation:fadeUp .3s ease}
+.progress-chapter-bar{width:100%;height:8px;background:var(--bg-raise);border-radius:99px;overflow:hidden;margin:6px 0}
+.chapter-progress-fill{height:100%;border-radius:99px;transition:width .6s ease}
+.topic-chip{display:inline-flex;padding:4px 10px;background:var(--bg-raise);border-radius:99px;font-size:12px;color:var(--txt-muted);margin:3px}
+.source-box{background:var(--bg-surf);border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:var(--radius);padding:12px 14px;font-size:13px;color:var(--txt-muted);line-height:1.6;margin-top:10px}
+.source-box strong{color:var(--txt);display:block;margin-bottom:4px;font-size:12px}
+.answer-feedback{border-radius:var(--radius);padding:16px;margin-top:12px;font-size:14px;line-height:1.6}
+.answer-feedback.correct{background:var(--success-dim);border:1px solid rgba(34,197,94,0.2);color:#4ade80}
+.answer-feedback.wrong{background:var(--danger-dim);border:1px solid rgba(239,68,68,0.2);color:#f87171}
+.exam-q{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px}
+.exam-q-num{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--txt-muted);margin-bottom:8px}
+.exam-q-text{font-size:15px;color:var(--txt);margin-bottom:14px;line-height:1.6}
+.pill-row{display:flex;flex-wrap:wrap;gap:6px}
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:64px 24px;text-align:center;color:var(--txt-muted)}
+.empty-state-icon{font-size:48px;margin-bottom:16px;opacity:.5}
+.empty-state h3{font-family:var(--font-display);font-size:22px;color:var(--txt);margin-bottom:8px}
+.empty-state p{font-size:14px;max-width:320px;line-height:1.6}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+/* ─── Icons (inline SVG) ────────────────────────────── */
+const Icon = ({ name, size = 16, style = {} }) => {
+  const icons = {
+    home: <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>,
+    upload: <><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></>,
+    map: <><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>,
+    book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></>,
+    pen: <><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>,
+    award: <><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></>,
+    bar: <><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>,
+    send: <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>,
+    plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
+    check: <polyline points="20 6 9 17 4 12"/>,
+    x: <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+    arrow: <><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></>,
+    arrowL: <><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></>,
+    file: <><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></>,
+    trash: <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></>,
+    clock: <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+    star: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>,
+    zap: <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>,
+    user: <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+    settings: <><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></>,
+    menu: <><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></>,
+    info: <><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>,
+    refresh: <><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.07"/></>,
+    eye: <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>,
+    layers: <><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>,
+  };
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      {icons[name]}
+    </svg>
+  );
+};
+
+/* ─── Mock Data ─────────────────────────────────────── */
+const mockChapters = [
+  { id:1, title:'Introduction to Operating Systems', objective:'Understand OS roles, history, and structure', importance:3, status:'done', orderIndex:1 },
+  { id:2, title:'Process Management & Scheduling', objective:'CPU scheduling algorithms and process lifecycle', importance:5, status:'current', orderIndex:2 },
+  { id:3, title:'Memory Management', objective:'Virtual memory, paging, and segmentation', importance:5, status:'locked', orderIndex:3 },
+  { id:4, title:'File Systems', objective:'File organization, directories, and allocation', importance:4, status:'locked', orderIndex:4 },
+  { id:5, title:'I/O and Device Management', objective:'Device drivers, disk scheduling algorithms', importance:3, status:'locked', orderIndex:5 },
+  { id:6, title:'Security & Protection', objective:'Access control, authentication mechanisms', importance:4, status:'locked', orderIndex:6 },
+];
+
+const mockExamQuestions = [
+  { id:1, type:'mcq', text:'Which scheduling algorithm gives the minimum average waiting time for a given set of processes?', choices:['FCFS','Shortest Job First (SJF)','Round Robin','Priority Scheduling'], correct:1 },
+  { id:2, type:'mcq', text:'In a paging system, which of the following is used to translate a logical address to a physical address?', choices:['Segment table','Page table','Inverted page table','TLB only'], correct:1 },
+  { id:3, type:'short', text:'Explain the difference between internal fragmentation and external fragmentation. Give an example of each.' },
+  { id:4, type:'mcq', text:'Which of the following is NOT a method to handle deadlock?', choices:['Deadlock prevention','Deadlock avoidance','Deadlock detection','Deadlock transformation'], correct:3 },
+  { id:5, type:'short', text:'Describe the Producer-Consumer problem and explain how semaphores solve it.' },
+];
+
+const mockProgress = [
+  { date:'Mon', chapters:1, exercises:8, score:null },
+  { date:'Tue', chapters:2, exercises:15, score:null },
+  { date:'Wed', chapters:1, exercises:12, score:null },
+  { date:'Thu', chapters:0, exercises:20, score:null },
+  { date:'Fri', chapters:2, exercises:18, score:72 },
+  { date:'Sat', chapters:1, exercises:10, score:null },
+  { date:'Sun', chapters:2, exercises:5, score:null },
+];
+
+const lessonContent = `Process Management is at the heart of every modern operating system. A **process** is an instance of a program in execution — distinct from the program itself, which is merely a static set of instructions.
+
+Each process maintains its own **Process Control Block (PCB)**, which stores essential information: the process ID, program counter, CPU registers, memory limits, open files, and scheduling information.
+
+**Process States:**
+A process transitions through several states during its lifetime:
+1. **New** — The process is being created
+2. **Ready** — Waiting to be assigned to a CPU
+3. **Running** — Instructions are being executed
+4. **Waiting** — Waiting for some event (I/O, signal)
+5. **Terminated** — The process has finished execution
+
+**CPU Scheduling:**
+The scheduler decides which ready process gets CPU time. Common algorithms include:
+• **FCFS** (First Come, First Served) — simple but can cause the convoy effect
+• **SJF** (Shortest Job First) — optimal for average wait time, but requires knowing burst times
+• **Round Robin** — each process gets a fixed time quantum, good for interactive systems
+• **Priority Scheduling** — processes run in order of priority; can suffer from starvation`;
+
+/* ─── Vercel AI SDK–style useChat hook (calls Anthropic API) ─ */
+function useChat({ systemPrompt = '' } = {}) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const append = useCallback(async (userMsg) => {
+    const newMessages = [...messages, { role:'user', content: userMsg }];
+    setMessages(newMessages);
+    setIsLoading(true);
+
+    try {
+      // Vercel AI SDK pattern: POST to /api/chat with messages array
+      // Here we call Anthropic directly as the prototype backend substitute
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'x-api-key': window.__ANTHROPIC_KEY__ || '' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 600,
+          system: systemPrompt || `You are an AI exam tutor for PassExamAI. Help students understand concepts clearly and concisely. Always reference the chapter context. Keep answers focused and academic. End with a source note like: [Source: Chapter notes – OS Fundamentals]`,
+          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
+        })
+      });
+
+      if (!res.ok) throw new Error('API error');
+      const data = await res.json();
+      const assistantText = data.content?.[0]?.text || "I'm here to help! Ask me anything about this chapter.";
+      setMessages(prev => [...prev, { role:'assistant', content: assistantText }]);
+    } catch {
+      // Graceful fallback with canned responses for demo
+      const demos = [
+        "Great question! In the context of CPU scheduling, the **Shortest Job First (SJF)** algorithm minimises average waiting time by always running the shortest available process next. However, the key practical challenge is predicting burst times — we often use exponential averaging of past CPU bursts to estimate future ones.\n\n[Source: Chapter 2 – Process Scheduling, OS Fundamentals Notes]",
+        "The **Process Control Block (PCB)** is a data structure maintained by the OS for every process. It contains: the process state, program counter, CPU registers, memory management info, I/O status, and accounting information. Think of it as the process's identity card.\n\n[Source: Chapter 2 – Process Management, Lecture Slides]",
+        "Context switching occurs when the CPU switches from one process to another. The OS saves the current process state into its PCB, then loads the new process's PCB. This is pure overhead — no useful work is done during the switch, which is why minimising context switch time is important.\n\n[Source: Chapter 2 – Process Management, University Notes]",
+      ];
+      const reply = demos[messages.length % demos.length];
+      setMessages(prev => [...prev, { role:'assistant', content: reply }]);
+    }
+    setIsLoading(false);
+  }, [messages, systemPrompt]);
+
+  const handleSubmit = useCallback((e) => {
+    e?.preventDefault();
+    if (!input.trim() || isLoading) return;
+    const msg = input.trim();
+    setInput('');
+    append(msg);
+  }, [input, isLoading, append]);
+
+  return { messages, input, setInput, isLoading, handleSubmit, append };
+}
+
+/* ─── Components ─────────────────────────────────────── */
+
+function Spinner({ size = 16 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation:'spin .7s linear infinite' }}>
+    <circle cx="12" cy="12" r="10" strokeOpacity=".2"/>
+    <path d="M12 2a10 10 0 0 1 10 10" />
+  </svg>;
+}
+
+function ScoreRing({ score, size = 120 }) {
+  const r = 44; const circ = 2 * Math.PI * r;
+  const pct = score / 100;
+  const color = score >= 70 ? '#22C55E' : score >= 50 ? '#F5A623' : '#EF4444';
+  return (
+    <div className="score-ring" style={{ width:size, height:size }}>
+      <svg width={size} height={size} viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r={r} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="8"/>
+        <circle cx="50" cy="50" r={r} fill="none" stroke={color} strokeWidth="8"
+          strokeDasharray={`${circ * pct} ${circ * (1-pct)}`}
+          strokeLinecap="round" style={{ transition:'stroke-dasharray 1s ease' }}/>
+      </svg>
+      <div className="score-label">
+        <div className="score-num" style={{ fontSize: size < 100 ? '24px' : '36px' }}>{score}</div>
+        <div className="score-pct">/ 100</div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Screens ─────────────────────────────────────────── */
+
+function Landing({ onNav }) {
+  const features = [
+    { icon:'📄', title:'Upload Any Document', desc:'PDF, past papers, syllabi, or notes — the system extracts and understands everything.', color:'#4F7EF5' },
+    { icon:'🗺️', title:'Smart Revision Roadmap', desc:'AI analyses your material and builds a prioritised, chapter-by-chapter study plan.', color:'#22C55E' },
+    { icon:'🤖', title:'AI Tutor Per Chapter', desc:'Ask questions grounded in your documents. Every answer cites its source.', color:'#F5A623' },
+    { icon:'📝', title:'Practice & Mock Exams', desc:'Exercises and full mock exams generated from your actual exam style and topics.', color:'#A855F7' },
+    { icon:'✅', title:'Grading & Feedback', desc:'Instant scoring with topic-level insights and improvement suggestions.', color:'#EF4444' },
+    { icon:'📈', title:'Progress Tracking', desc:'See your growth chapter by chapter, session by session.', color:'#0EA5E9' },
+  ];
+  const flow = ['Upload','Analyse','Roadmap','Learn','Practice','Exam','Feedback'];
+  return (
+    <div style={{ flex:1, overflowY:'auto' }}>
+      <nav style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 32px', borderBottom:'1px solid var(--border)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div className="logo-icon">P</div>
+          <span className="logo-text">PassExamAI</span>
+        </div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => onNav('login')}>Log in</button>
+          <button className="btn btn-primary btn-sm" onClick={() => onNav('signup')}>Get started</button>
+        </div>
+      </nav>
+      <div className="landing-hero fade-up">
+        <div className="hero-eyebrow">AI-powered exam preparation</div>
+        <h1 className="hero-title">Turn your exam paper into a <span>guided revision path</span></h1>
+        <p className="hero-sub">Upload your documents and PassExamAI builds you a structured learning roadmap — with lessons, AI tutoring, exercises, and mock exams grounded in your actual material.</p>
+        <div style={{ display:'flex', gap:12, flexWrap:'wrap', justifyContent:'center' }}>
+          <button className="btn btn-primary btn-lg" onClick={() => onNav('signup')}>
+            Start revising free <Icon name="arrow" size={16}/>
+          </button>
+          <button className="btn btn-outline btn-lg" onClick={() => onNav('roadmap')}>
+            See demo <Icon name="eye" size={16}/>
+          </button>
+        </div>
+      </div>
+
+      <div className="flow-steps">
+        {flow.map((s, i) => (
+          <React.Fragment key={s}>
+            <div className="flow-step">
+              <div className="flow-step-num">{i+1}</div>
+              <div className="flow-step-label">{s}</div>
+            </div>
+            {i < flow.length - 1 && <div className="flow-arrow">→</div>}
+          </React.Fragment>
+        ))}
+      </div>
+
+      <div className="feature-grid" style={{ paddingBottom:60 }}>
+        {features.map(f => (
+          <div className="feature-card fade-up" key={f.title} style={{ '--delay': '0.1s' }}>
+            <div className="feature-icon" style={{ background: f.color + '20' }}>{f.icon}</div>
+            <h3>{f.title}</h3>
+            <p>{f.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ textAlign:'center', padding:'40px 24px 80px', borderTop:'1px solid var(--border)' }}>
+        <h2 style={{ fontFamily:'var(--font-display)', fontSize:'clamp(28px,4vw,42px)', marginBottom:12, color:'var(--txt)' }}>Ready to pass your exam?</h2>
+        <p style={{ color:'var(--txt-muted)', marginBottom:24, fontSize:16 }}>Join students who trust PassExamAI for structured, reliable exam preparation.</p>
+        <button className="btn btn-primary btn-lg" onClick={() => onNav('signup')}>Create free account</button>
+      </div>
+    </div>
+  );
+}
+
+function Auth({ mode = 'login', onNav }) {
+  const [tab, setTab] = useState(mode);
+  const [form, setForm] = useState({ name:'', email:'', password:'' });
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setTimeout(() => { setLoading(false); onNav('dashboard'); }, 1200);
+  };
+
+  return (
+    <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', padding:24, minHeight:'100vh' }}>
+      <div className="auth-card fade-up">
+        <div style={{ textAlign:'center', marginBottom:28 }}>
+          <div className="logo-icon" style={{ margin:'0 auto 12px', width:44, height:44, fontSize:20, borderRadius:12 }}>P</div>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:700, color:'var(--txt)' }}>PassExamAI</h1>
+          <p style={{ color:'var(--txt-muted)', fontSize:14, marginTop:4 }}>Your AI exam preparation assistant</p>
+        </div>
+
+        <div className="card" style={{ padding:0, overflow:'hidden' }}>
+          <div style={{ display:'flex', borderBottom:'1px solid var(--border)' }}>
+            {['login','signup'].map(t => (
+              <button key={t} className={`auth-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>
+                {t === 'login' ? 'Log in' : 'Sign up'}
+              </button>
+            ))}
+          </div>
+          <form onSubmit={handleSubmit} style={{ padding:'24px' }}>
+            {tab === 'signup' && (
+              <div className="form-group">
+                <label className="label">Full name</label>
+                <input className="input" placeholder="Alex Johnson" value={form.name}
+                  onChange={e => setForm(f => ({...f, name: e.target.value}))} required/>
+              </div>
+            )}
+            <div className="form-group">
+              <label className="label">Email address</label>
+              <input className="input" type="email" placeholder="alex@university.ac.uk" value={form.email}
+                onChange={e => setForm(f => ({...f, email: e.target.value}))} required/>
+            </div>
+            <div className="form-group">
+              <label className="label">Password</label>
+              <input className="input" type="password" placeholder={tab === 'signup' ? 'At least 8 characters' : 'Your password'} value={form.password}
+                onChange={e => setForm(f => ({...f, password: e.target.value}))} required/>
+            </div>
+            {tab === 'login' && (
+              <div style={{ textAlign:'right', marginTop:-8, marginBottom:16 }}>
+                <span style={{ fontSize:13, color:'var(--primary)', cursor:'pointer' }}>Forgot password?</span>
+              </div>
+            )}
+            <button type="submit" className="btn btn-primary" style={{ width:'100%', justifyContent:'center' }} disabled={loading}>
+              {loading ? <Spinner size={16}/> : (tab === 'login' ? 'Log in to account' : 'Create account')}
+            </button>
+            <div className="auth-divider">or continue with</div>
+            <button type="button" className="btn btn-outline" style={{ width:'100%', justifyContent:'center', gap:10 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Continue with Google
+            </button>
+          </form>
+        </div>
+
+        <p style={{ textAlign:'center', fontSize:13, color:'var(--txt-muted)', marginTop:16 }}>
+          {tab === 'login' ? "Don't have an account? " : "Already have an account? "}
+          <span style={{ color:'var(--primary)', cursor:'pointer' }} onClick={() => setTab(tab === 'login' ? 'signup' : 'login')}>
+            {tab === 'login' ? 'Sign up free' : 'Log in'}
+          </span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ onNav }) {
+  const projects = [
+    { id:1, title:'Operating Systems – CS3004', subject:'Computer Science', docs:3, progress:35, chapters:6, lastSeen:'2h ago', status:'active' },
+    { id:2, title:'Data Structures Final Exam', subject:'Computer Science', docs:2, progress:80, chapters:8, lastSeen:'1d ago', status:'active' },
+    { id:3, title:'Machine Learning Mid-Term', subject:'AI / ML', docs:1, progress:0, chapters:0, lastSeen:'3d ago', status:'new' },
+  ];
+  return (
+    <div className="page fade-up">
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:28 }}>
+        <div>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:700 }}>Good morning, Alex 👋</h1>
+          <p style={{ color:'var(--txt-muted)', marginTop:4, fontSize:14 }}>Ready to continue your revision?</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => onNav('upload')}>
+          <Icon name="plus" size={15}/> New study plan
+        </button>
+      </div>
+
+      <div className="grid-4" style={{ marginBottom:28 }}>
+        {[
+          { label:'Study projects', value:'3', icon:'layers', color:'var(--primary)' },
+          { label:'Chapters studied', value:'11', icon:'book', color:'var(--success)' },
+          { label:'Exercises done', value:'68', icon:'pen', color:'var(--accent)' },
+          { label:'Mock exams taken', value:'2', icon:'award', color:'#A855F7' },
+        ].map(s => (
+          <div className="card" key={s.label} style={{ display:'flex', alignItems:'center', gap:14 }}>
+            <div style={{ width:40, height:40, borderRadius:10, background: s.color + '18', display:'flex', alignItems:'center', justifyContent:'center', color: s.color, flexShrink:0 }}>
+              <Icon name={s.icon} size={18}/>
+            </div>
+            <div>
+              <div style={{ fontSize:24, fontWeight:700, fontFamily:'var(--font-display)', lineHeight:1.1 }}>{s.value}</div>
+              <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{s.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, marginBottom:16 }}>Your study plans</h2>
+      <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        {projects.map(p => (
+          <div className="card card-hover" key={p.id} onClick={() => onNav('roadmap')}
+            style={{ display:'flex', alignItems:'center', gap:20 }}>
+            <div style={{ width:48, height:48, borderRadius:12, background:'var(--primary-dim)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <Icon name="book" size={22} style={{ color:'var(--primary)' }}/>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:4 }}>
+                <span style={{ fontSize:16, fontWeight:600, color:'var(--txt)' }} className="truncate">{p.title}</span>
+                <span className={`badge ${p.status === 'new' ? 'badge-warning' : 'badge-success'}`}>{p.status === 'new' ? 'New' : 'Active'}</span>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:16, fontSize:13, color:'var(--txt-muted)' }}>
+                <span>{p.subject}</span>
+                <span>•</span>
+                <span>{p.docs} documents</span>
+                <span>•</span>
+                <span>{p.chapters} chapters</span>
+              </div>
+              {p.progress > 0 && (
+                <div style={{ marginTop:8 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <span style={{ fontSize:12, color:'var(--txt-muted)' }}>Progress</span>
+                    <span style={{ fontSize:12, color:'var(--txt-muted)' }}>{p.progress}%</span>
+                  </div>
+                  <div className="progress-bar">
+                    <div className="progress-fill" style={{ width:`${p.progress}%` }}/>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div style={{ textAlign:'right', flexShrink:0 }}>
+              <div style={{ fontSize:12, color:'var(--txt-sub)', marginBottom:8 }}>{p.lastSeen}</div>
+              <button className="btn btn-outline btn-sm">
+                {p.status === 'new' ? 'Set up' : 'Continue'} <Icon name="arrow" size={13}/>
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop:32, display:'flex', gap:16, flexWrap:'wrap' }}>
+        <div className="card" style={{ flex:'1', minWidth:260 }}>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:12 }}>Today's focus</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {[
+              { label:'Complete Chapter 2 exercises', done:false, type:'exercise' },
+              { label:'Review Process Scheduling lesson', done:true, type:'lesson' },
+              { label:'Take OS Chapter 2 quiz', done:false, type:'exam' },
+            ].map((t, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 12px', background:'var(--bg-surf)', borderRadius:'var(--radius)', opacity: t.done ? .5 : 1 }}>
+                <div style={{ width:18, height:18, borderRadius:4, border:`1.5px solid ${t.done ? 'var(--success)' : 'var(--border-act)'}`, background: t.done ? 'var(--success)' : 'transparent', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  {t.done && <Icon name="check" size={12} style={{ color:'#fff' }}/>}
+                </div>
+                <span style={{ fontSize:13, color: t.done ? 'var(--txt-muted)' : 'var(--txt)', textDecoration: t.done ? 'line-through' : 'none', flex:1 }}>{t.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="card" style={{ flex:'1', minWidth:260 }}>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:12 }}>Recent activity</h3>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {[
+              { action:'Studied', target:'Chapter 1 – Intro to OS', time:'2h ago', icon:'book', c:'var(--primary)' },
+              { action:'Scored 72%', target:'Mock Exam – Data Structures', time:'Yesterday', icon:'award', c:'var(--accent)' },
+              { action:'Completed', target:'8 exercises in Chapter 2', time:'Yesterday', icon:'check', c:'var(--success)' },
+            ].map((a, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:12, paddingBottom:10, borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width:32, height:32, borderRadius:8, background: a.c + '18', color:a.c, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                  <Icon name={a.icon} size={14}/>
+                </div>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:13, color:'var(--txt)' }}><strong>{a.action}</strong> {a.target}</div>
+                  <div style={{ fontSize:11, color:'var(--txt-sub)', marginTop:1 }}>{a.time}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UploadPage({ onNav }) {
+  const [drag, setDrag] = useState(false);
+  const [files, setFiles] = useState([
+    { name:'OS_Past_Paper_2023.pdf', size:'2.4 MB', type:'exam', status:'done' },
+    { name:'Lecture_Notes_Week1-6.pdf', size:'8.1 MB', type:'notes', status:'done' },
+  ]);
+  const [generating, setGenerating] = useState(false);
+
+  const handleDrop = (e) => {
+    e.preventDefault(); setDrag(false);
+    const dropped = Array.from(e.dataTransfer.files);
+    const newFiles = dropped.map(f => ({ name:f.name, size:(f.size/1024/1024).toFixed(1)+' MB', type:'notes', status:'processing' }));
+    setFiles(prev => [...prev, ...newFiles]);
+    setTimeout(() => setFiles(prev => prev.map(f => f.status === 'processing' ? {...f, status:'done'} : f)), 2000);
+  };
+
+  const handleGenerate = () => {
+    setGenerating(true);
+    setTimeout(() => { setGenerating(false); onNav('roadmap'); }, 2500);
+  };
+
+  return (
+    <div className="page fade-up">
+      <div style={{ maxWidth:760, margin:'0 auto' }}>
+        <div style={{ marginBottom:28 }}>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:700 }}>Upload your study material</h1>
+          <p style={{ color:'var(--txt-muted)', marginTop:6, fontSize:14 }}>Add your exam papers, syllabi, or lecture notes. PassExamAI will analyse them and build your revision roadmap.</p>
+        </div>
+
+        <div className={`dropzone ${drag ? 'drag' : ''}`}
+          onDragOver={e => { e.preventDefault(); setDrag(true); }}
+          onDragLeave={() => setDrag(false)}
+          onDrop={handleDrop}
+          onClick={() => {}}>
+          <span className="dropzone-icon">📄</span>
+          <h3>Drop files here</h3>
+          <p>Supports PDF, TXT, DOCX · Up to 50 MB per file</p>
+          <button className="btn btn-outline btn-sm" style={{ marginTop:16 }}>Browse files</button>
+        </div>
+
+        {files.length > 0 && (
+          <div style={{ marginTop:20 }}>
+            <h3 style={{ fontSize:14, fontWeight:600, color:'var(--txt-muted)', marginBottom:12 }}>Uploaded documents ({files.length})</h3>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {files.map((f, i) => (
+                <div key={i} className="card" style={{ display:'flex', alignItems:'center', gap:14, padding:'12px 16px' }}>
+                  <Icon name="file" size={20} style={{ color:'var(--primary)', flexShrink:0 }}/>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:500, color:'var(--txt)' }} className="truncate">{f.name}</div>
+                    <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{f.size}</div>
+                  </div>
+                  <select className="input" style={{ width:'auto', fontSize:12, padding:'4px 8px' }}
+                    value={f.type} onChange={() => {}}>
+                    <option value="exam">Past exam</option>
+                    <option value="notes">Lecture notes</option>
+                    <option value="syllabus">Syllabus</option>
+                    <option value="reference">Reference</option>
+                  </select>
+                  {f.status === 'processing' ? (
+                    <Spinner size={16}/>
+                  ) : (
+                    <span className="badge badge-success"><Icon name="check" size={10}/> Ready</span>
+                  )}
+                  <button className="btn btn-icon btn-ghost" onClick={() => setFiles(prev => prev.filter((_,j) => j !== i))}>
+                    <Icon name="trash" size={14} style={{ color:'var(--danger)' }}/>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="card" style={{ marginTop:20 }}>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:16, marginBottom:14 }}>Study plan settings</h3>
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="label">Plan title</label>
+              <input className="input" defaultValue="Operating Systems – CS3004"/>
+            </div>
+            <div className="form-group">
+              <label className="label">Subject</label>
+              <select className="input">
+                <option>Computer Science</option>
+                <option>Mathematics</option>
+                <option>Physics</option>
+                <option>Biology</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="label">Target exam date</label>
+              <input className="input" type="date" defaultValue="2026-05-15"/>
+            </div>
+            <div className="form-group">
+              <label className="label">Exam format</label>
+              <select className="input">
+                <option>University written exam</option>
+                <option>MCQ-based exam</option>
+                <option>Mixed format</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:12, marginTop:24, justifyContent:'flex-end' }}>
+          <button className="btn btn-outline" onClick={() => onNav('dashboard')}>Cancel</button>
+          <button className="btn btn-primary btn-lg" onClick={handleGenerate} disabled={files.length === 0 || generating}>
+            {generating ? <><Spinner size={16}/> Generating roadmap…</> : <><Icon name="zap" size={16}/> Generate revision roadmap</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function RoadmapPage({ onNav }) {
+  const total = mockChapters.length;
+  const done = mockChapters.filter(c => c.status === 'done').length;
+  const pct = Math.round((done / total) * 100);
+
+  return (
+    <div className="page fade-up">
+      <div style={{ display:'flex', gap:24, flexWrap:'wrap' }}>
+        <div style={{ flex:2, minWidth:300 }}>
+          <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:20, gap:16 }}>
+            <div>
+              <h1 style={{ fontFamily:'var(--font-display)', fontSize:26, fontWeight:700, marginBottom:4 }}>
+                Operating Systems – CS3004
+              </h1>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                <span className="badge badge-primary"><Icon name="map" size={11}/> 6 chapters</span>
+                <span className="badge badge-neutral"><Icon name="clock" size={11}/> ~18 hrs estimated</span>
+                <span className="badge badge-success"><Icon name="check" size={11}/> {done} completed</span>
+              </div>
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={() => onNav('upload')}><Icon name="refresh" size={14}/> Re-generate</button>
+          </div>
+
+          <div className="card" style={{ marginBottom:20 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+              <span style={{ fontSize:14, fontWeight:500 }}>Overall progress</span>
+              <span style={{ fontSize:14, fontWeight:700, color:'var(--primary)' }}>{pct}%</span>
+            </div>
+            <div className="progress-bar" style={{ height:8 }}>
+              <div className="progress-fill" style={{ width:`${pct}%` }}/>
+            </div>
+            <div style={{ display:'flex', gap:16, marginTop:12, fontSize:13, color:'var(--txt-muted)' }}>
+              <span style={{ color:'var(--success)' }}>✓ {done} completed</span>
+              <span style={{ color:'var(--primary)' }}>◉ 1 in progress</span>
+              <span>⊘ {total - done - 1} remaining</span>
+            </div>
+          </div>
+
+          <div style={{ paddingLeft:8 }}>
+            {mockChapters.map((ch, i) => (
+              <div className="roadmap-item" key={ch.id}>
+                <div className="roadmap-connector">
+                  <div className={`roadmap-node ${ch.status}`}>
+                    {ch.status === 'done' ? <Icon name="check" size={14}/> : ch.orderIndex}
+                  </div>
+                  {i < mockChapters.length - 1 && <div className="roadmap-line" style={{ minHeight:48 }}/>}
+                </div>
+                <div className="roadmap-body">
+                  <div className="card card-hover" onClick={() => ch.status !== 'locked' && onNav('chapter')}
+                    style={{ opacity: ch.status === 'locked' ? .5 : 1, cursor: ch.status === 'locked' ? 'not-allowed' : 'pointer' }}>
+                    <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12 }}>
+                      <div>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                          <h3 style={{ fontSize:15, fontWeight:600, color:'var(--txt)' }}>Ch {ch.orderIndex}. {ch.title}</h3>
+                          {ch.status === 'current' && <span className="badge badge-primary" style={{ fontSize:11 }}>In progress</span>}
+                          {ch.status === 'done' && <span className="badge badge-success" style={{ fontSize:11 }}>Done</span>}
+                        </div>
+                        <p style={{ fontSize:13, color:'var(--txt-muted)', marginBottom:8 }}>{ch.objective}</p>
+                        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                          <span style={{ fontSize:12, color:'var(--txt-sub)' }}>Importance</span>
+                          <div className="importance-bar">
+                            <div className="importance-fill" style={{ width:`${(ch.importance / 5) * 100}%` }}/>
+                          </div>
+                          <span style={{ fontSize:12, color:'var(--accent)' }}>{ch.importance}/5</span>
+                        </div>
+                      </div>
+                      {ch.status !== 'locked' && (
+                        <button className={`btn btn-sm ${ch.status === 'done' ? 'btn-outline' : 'btn-primary'}`}
+                          onClick={e => { e.stopPropagation(); onNav('chapter'); }}>
+                          {ch.status === 'done' ? 'Review' : 'Continue'} <Icon name="arrow" size={13}/>
+                        </button>
+                      )}
+                    </div>
+                    {ch.status === 'current' && (
+                      <div style={{ marginTop:12 }}>
+                        <div className="progress-bar" style={{ height:4 }}>
+                          <div className="progress-fill" style={{ width:'45%' }}/>
+                        </div>
+                        <span style={{ fontSize:11, color:'var(--txt-muted)', marginTop:4, display:'block' }}>45% – Lesson read, exercises pending</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ width:260, flexShrink:0 }}>
+          <div className="card" style={{ marginBottom:16 }}>
+            <h3 style={{ fontFamily:'var(--font-display)', fontSize:16, marginBottom:14 }}>Recommended next</h3>
+            <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+              <button className="btn btn-primary" style={{ justifyContent:'center', width:'100%' }} onClick={() => onNav('chapter')}>
+                <Icon name="book" size={15}/> Continue Ch. 2
+              </button>
+              <button className="btn btn-outline" style={{ justifyContent:'center', width:'100%' }} onClick={() => onNav('exercises')}>
+                <Icon name="pen" size={15}/> Do Ch. 2 exercises
+              </button>
+              <button className="btn btn-outline" style={{ justifyContent:'center', width:'100%' }} onClick={() => onNav('exam')}>
+                <Icon name="award" size={15}/> Take mock exam
+              </button>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 style={{ fontFamily:'var(--font-display)', fontSize:16, marginBottom:12 }}>Documents</h3>
+            {[
+              { name:'OS_Past_Paper_2023.pdf', type:'Past exam' },
+              { name:'Lecture_Notes.pdf', type:'Notes' },
+              { name:'Chapter_Summaries.pdf', type:'Reference' },
+            ].map((d, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                <Icon name="file" size={14} style={{ color:'var(--primary)', flexShrink:0 }}/>
+                <div style={{ flex:1, minWidth:0 }}>
+                  <div style={{ fontSize:12, color:'var(--txt)' }} className="truncate">{d.name}</div>
+                  <div style={{ fontSize:11, color:'var(--txt-muted)' }}>{d.type}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChapterPage({ onNav }) {
+  const [activeTab, setActiveTab] = useState('lesson');
+  const chat = useChat({
+    systemPrompt: `You are an AI tutor for the chapter "Process Management & Scheduling" in an Operating Systems course. 
+    Answer questions based on the chapter content provided. Keep answers clear, educational, and concise (under 200 words).
+    Always end with a source note like [Source: Chapter 2 notes].`
+  });
+  const chatEndRef = useRef(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior:'smooth' });
+  }, [chat.messages, chat.isLoading]);
+
+  const tabs = [
+    { id:'lesson', label:'Lesson', icon:'book' },
+    { id:'tutor', label:'AI Tutor', icon:'zap' },
+    { id:'exercises', label:'Exercises', icon:'pen' },
+  ];
+
+  return (
+    <div className="page fade-up" style={{ height:'calc(100vh - 64px)', overflow:'hidden', display:'flex', flexDirection:'column' }}>
+      {/* Chapter header */}
+      <div style={{ display:'flex', alignItems:'center', gap:16, paddingBottom:16, borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+        <button className="btn btn-ghost btn-sm" onClick={() => onNav('roadmap')}>
+          <Icon name="arrowL" size={15}/> Roadmap
+        </button>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <span style={{ fontSize:12, color:'var(--txt-muted)' }}>Chapter 2 of 6</span>
+            <span className="badge badge-primary">In progress</span>
+          </div>
+          <h2 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700, color:'var(--txt)', marginTop:2 }}>
+            Process Management & Scheduling
+          </h2>
+        </div>
+        <div style={{ display:'flex', gap:8, flexShrink:0 }}>
+          <button className="btn btn-outline btn-sm" onClick={() => onNav('exercises')}>Exercises <span className="nav-badge">5</span></button>
+          <button className="btn btn-primary btn-sm" onClick={() => onNav('roadmap')}>
+            <Icon name="check" size={13}/> Complete chapter
+          </button>
+        </div>
+      </div>
+
+      {/* Chapter progress */}
+      <div style={{ paddingTop:10, paddingBottom:8, flexShrink:0 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+          <span style={{ fontSize:12, color:'var(--txt-muted)' }}>Chapter progress</span>
+          <span style={{ fontSize:12, color:'var(--txt-muted)' }}>45%</span>
+        </div>
+        <div className="progress-bar"><div className="progress-fill" style={{ width:'45%' }}/></div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', gap:4, borderBottom:'1px solid var(--border)', flexShrink:0, marginBottom:0 }}>
+        {tabs.map(t => (
+          <button key={t.id} onClick={() => setActiveTab(t.id)}
+            style={{
+              display:'flex', alignItems:'center', gap:6, padding:'10px 14px', fontSize:14, fontWeight:500,
+              cursor:'pointer', background:'transparent', border:'none', borderBottom:`2px solid ${activeTab === t.id ? 'var(--primary)' : 'transparent'}`,
+              color: activeTab === t.id ? 'var(--primary)' : 'var(--txt-muted)', transition:'all .15s'
+            }}>
+            <Icon name={t.icon} size={14}/> {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content area */}
+      <div style={{ flex:1, overflow:'hidden', display:'flex', marginTop:16 }}>
+
+        {activeTab === 'lesson' && (
+          <div style={{ display:'flex', gap:20, flex:1, overflow:'hidden' }}>
+            <div style={{ flex:1, overflowY:'auto', paddingRight:8 }}>
+              <div style={{ maxWidth:680 }}>
+                <div style={{ background:'var(--bg-raise)', borderRadius:'var(--radius)', padding:'12px 16px', marginBottom:20, fontSize:13, color:'var(--txt-muted)', borderLeft:'3px solid var(--primary)' }}>
+                  <strong style={{ color:'var(--primary)', fontSize:12, display:'block', marginBottom:2 }}>Learning objective</strong>
+                  CPU scheduling algorithms and process lifecycle — understand how the OS manages concurrent processes and decides which gets CPU time.
+                </div>
+
+                {lessonContent.split('\n\n').map((para, i) => (
+                  <div key={i} style={{ marginBottom:16, fontSize:15, lineHeight:1.75, color:'var(--txt)' }}>
+                    {para.split('**').map((part, j) => j % 2 === 1 ? <strong key={j} style={{ color:'var(--txt)', fontWeight:600 }}>{part}</strong> : part.split('\n').map((line, k) => (
+                      <React.Fragment key={k}>{line.startsWith('•') ? <div style={{ paddingLeft:12, marginTop:4, color:'var(--txt-muted)' }}>{line}</div> : line}{k < part.split('\n').length - 1 && <br/>}</React.Fragment>
+                    )))}
+                  </div>
+                ))}
+
+                <div className="source-box">
+                  <strong><Icon name="file" size={11} style={{ verticalAlign:'middle', marginRight:4 }}/>Sources used</strong>
+                  OS Fundamentals Lecture Notes (Ch. 3, pp. 41–56) · Past Paper 2023 (Process questions) · University reference guide
+                </div>
+              </div>
+            </div>
+            <div style={{ width:200, flexShrink:0, borderLeft:'1px solid var(--border)', paddingLeft:16 }}>
+              <h4 style={{ fontSize:13, fontWeight:600, color:'var(--txt-muted)', marginBottom:10 }}>In this chapter</h4>
+              {['Process concept','Process states','PCB structure','Context switching','CPU scheduling','Scheduling algorithms','Multi-level queues'].map((t, i) => (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:8, padding:'6px 0', borderBottom:'1px solid var(--border)', cursor:'pointer' }}>
+                  <div style={{ width:6, height:6, borderRadius:'50%', background: i < 2 ? 'var(--success)' : i === 2 ? 'var(--primary)' : 'var(--border-act)', flexShrink:0 }}/>
+                  <span style={{ fontSize:12, color: i < 2 ? 'var(--txt-muted)' : i === 2 ? 'var(--txt)' : 'var(--txt-sub)', lineHeight:1.4 }}>{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'tutor' && (
+          <div style={{ flex:1, display:'flex', flexDirection:'column', overflow:'hidden' }}>
+            <div style={{ background:'var(--bg-raise)', borderRadius:'var(--radius)', padding:'12px 16px', marginBottom:16, flexShrink:0, fontSize:13, color:'var(--txt-muted)' }}>
+              <strong style={{ color:'var(--primary)' }}>AI Tutor</strong> — Ask anything about Process Management & Scheduling. Answers are grounded in your uploaded documents.
+              <br/><span style={{ fontSize:11, marginTop:2, display:'block', color:'var(--txt-sub)' }}>Note: Add your Anthropic API key to window.__ANTHROPIC_KEY__ for live responses. Demo fallbacks active.</span>
+            </div>
+
+            {chat.messages.length === 0 && (
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16, flexShrink:0 }}>
+                {[
+                  'Explain SJF scheduling',
+                  'What is a PCB?',
+                  'How does context switching work?',
+                  'Compare FCFS vs Round Robin',
+                ].map(q => (
+                  <button key={q} className="btn btn-outline btn-sm" onClick={() => chat.append(q)}>{q}</button>
+                ))}
+              </div>
+            )}
+
+            <div style={{ flex:1, overflowY:'auto', paddingRight:4 }}>
+              <div className="chat-wrap">
+                {chat.messages.map((m, i) => (
+                  <div key={i} className={`chat-bubble ${m.role === 'user' ? 'chat-user' : 'chat-ai'}`}>
+                    {m.content.split('[Source:').map((part, j) => j === 0 ? part : (
+                      <React.Fragment key={j}>
+                        <span className="source-cite" title="Source from knowledge base">📚 {part.replace(']','')}</span>
+                      </React.Fragment>
+                    ))}
+                  </div>
+                ))}
+                {chat.isLoading && (
+                  <div className="chat-bubble chat-ai">
+                    <div className="chat-typing"><span/><span/><span/></div>
+                  </div>
+                )}
+                <div ref={chatEndRef}/>
+              </div>
+            </div>
+
+            <div className="chat-input-row">
+              <input className="input" style={{ flex:1 }} placeholder="Ask about process scheduling, PCBs, algorithms…"
+                value={chat.input} onChange={e => chat.setInput(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && !e.shiftKey && chat.handleSubmit(e)}
+                disabled={chat.isLoading}/>
+              <button className="btn btn-primary btn-icon" onClick={chat.handleSubmit} disabled={!chat.input.trim() || chat.isLoading}>
+                <Icon name="send" size={16}/>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'exercises' && (
+          <div style={{ flex:1, overflowY:'auto' }}>
+            <div style={{ maxWidth:640 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+                <h3 style={{ fontFamily:'var(--font-display)', fontSize:18 }}>Chapter 2 Exercises</h3>
+                <button className="btn btn-primary" onClick={() => onNav('exercises')}>
+                  Open full exercise view <Icon name="arrow" size={13}/>
+                </button>
+              </div>
+              <ExerciseQuick onNav={onNav}/>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ExerciseQuick({ onNav }) {
+  const [selected, setSelected] = useState(null);
+  const [revealed, setRevealed] = useState(false);
+  const q = mockExamQuestions[0];
+
+  return (
+    <div className="card">
+      <div style={{ marginBottom:12 }}>
+        <span className="badge badge-primary" style={{ marginBottom:10, display:'inline-block' }}>Multiple choice · Q1 of 5</span>
+        <p style={{ fontSize:15, color:'var(--txt)', lineHeight:1.65 }}>{q.text}</p>
+      </div>
+      {q.choices.map((c, i) => (
+        <div key={i} className={`choice ${selected === i ? (revealed ? (i === q.correct ? 'correct' : 'wrong') : 'selected') : (revealed && i === q.correct ? 'correct' : '')}`}
+          onClick={() => !revealed && setSelected(i)}>
+          <div className="choice-label">{String.fromCharCode(65+i)}</div>
+          <span>{c}</span>
+          {revealed && i === q.correct && <Icon name="check" size={14} style={{ marginLeft:'auto' }}/>}
+        </div>
+      ))}
+      <div style={{ display:'flex', gap:10, marginTop:14 }}>
+        <button className="btn btn-primary" disabled={selected === null || revealed} onClick={() => setRevealed(true)}>
+          Check answer
+        </button>
+        {revealed && <button className="btn btn-outline" onClick={() => { setSelected(null); setRevealed(false); }}>
+          <Icon name="refresh" size={13}/> Try next
+        </button>}
+      </div>
+      {revealed && (
+        <div className={`answer-feedback ${selected === q.correct ? 'correct' : 'wrong'}`}>
+          {selected === q.correct
+            ? '✓ Correct! SJF minimises average waiting time by always running the shortest available process. However, it requires knowing or estimating burst times in advance.'
+            : `✗ The correct answer is B (${q.choices[q.correct]}). SJF minimises average waiting time — FCFS can cause the convoy effect, and Round Robin introduces overhead from frequent context switches.`}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExercisePage({ onNav }) {
+  const [current, setCurrent] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [revealed, setRevealed] = useState({});
+  const [shortAnswer, setShortAnswer] = useState('');
+  const q = mockExamQuestions[current];
+
+  return (
+    <div className="page fade-up">
+      <div style={{ maxWidth:720, margin:'0 auto' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24 }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => onNav('chapter')}><Icon name="arrowL" size={14}/> Back to chapter</button>
+          <div style={{ flex:1 }}>
+            <h1 style={{ fontFamily:'var(--font-display)', fontSize:22, fontWeight:700 }}>Chapter 2 Exercises</h1>
+          </div>
+          <span style={{ fontSize:14, color:'var(--txt-muted)', fontWeight:500 }}>{current+1} / {mockExamQuestions.length}</span>
+        </div>
+
+        <div className="progress-bar" style={{ marginBottom:24 }}>
+          <div className="progress-fill" style={{ width:`${((current) / mockExamQuestions.length) * 100}%` }}/>
+        </div>
+
+        <div className="card fade-up" key={current}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:14 }}>
+            <span className={`badge ${q.type === 'mcq' ? 'badge-primary' : 'badge-warning'}`}>
+              {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'}
+            </span>
+            <span className="badge badge-neutral">Question {current + 1}</span>
+          </div>
+          <p style={{ fontSize:16, lineHeight:1.7, color:'var(--txt)', marginBottom:20 }}>{q.text}</p>
+
+          {q.type === 'mcq' ? (
+            <>
+              {q.choices.map((c, i) => (
+                <div key={i}
+                  className={`choice ${answers[current] === i ? (revealed[current] ? (i === q.correct ? 'correct' : 'wrong') : 'selected') : (revealed[current] && i === q.correct ? 'correct' : '')}`}
+                  onClick={() => !revealed[current] && setAnswers(a => ({...a, [current]: i}))}>
+                  <div className="choice-label">{String.fromCharCode(65+i)}</div>
+                  <span>{c}</span>
+                  {revealed[current] && i === q.correct && <Icon name="check" size={14} style={{ marginLeft:'auto', color:'var(--success)' }}/>}
+                </div>
+              ))}
+              {!revealed[current] && (
+                <button className="btn btn-primary" style={{ marginTop:12 }} disabled={answers[current] === undefined}
+                  onClick={() => setRevealed(r => ({...r, [current]: true}))}>
+                  Check answer
+                </button>
+              )}
+              {revealed[current] && (
+                <div className={`answer-feedback ${answers[current] === q.correct ? 'correct' : 'wrong'}`}>
+                  {answers[current] === q.correct
+                    ? `✓ Correct! Well done. ${q.choices[q.correct]} is the right answer.`
+                    : `✗ The correct answer is ${String.fromCharCode(65+q.correct)}) ${q.choices[q.correct]}. Refer back to the scheduling algorithms section in your lesson.`}
+                  <div className="source-box" style={{ marginTop:8 }}><strong>Source</strong>OS Past Paper 2023, Q.3b · Lecture Notes Ch.3 p.48</div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <textarea className="input" placeholder="Type your answer here…" style={{ minHeight:140, marginBottom:12 }}
+                value={shortAnswer} onChange={e => setShortAnswer(e.target.value)}/>
+              {!revealed[current] ? (
+                <button className="btn btn-primary" disabled={!shortAnswer.trim()}
+                  onClick={() => setRevealed(r => ({...r, [current]: true}))}>
+                  <Icon name="zap" size={14}/> Get AI feedback
+                </button>
+              ) : (
+                <div className="answer-feedback correct">
+                  <strong style={{ display:'block', marginBottom:6 }}>AI Feedback</strong>
+                  Your answer covers the key distinction correctly. To improve: explicitly give a numerical example (e.g., with a 16KB page and 14KB process, 2KB of internal fragmentation occurs). External fragmentation explanation is accurate — mention compaction as a solution.
+                  <div style={{ marginTop:8, fontSize:12, color:'inherit', opacity:.8 }}>Score: 7/10 · <span style={{ cursor:'pointer', textDecoration:'underline' }}>See model answer</span></div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div style={{ display:'flex', justifyContent:'space-between', marginTop:20 }}>
+          <button className="btn btn-outline" disabled={current === 0} onClick={() => setCurrent(c => c - 1)}>
+            <Icon name="arrowL" size={14}/> Previous
+          </button>
+          {current < mockExamQuestions.length - 1 ? (
+            <button className="btn btn-primary" onClick={() => setCurrent(c => c + 1)}>
+              Next question <Icon name="arrow" size={14}/>
+            </button>
+          ) : (
+            <button className="btn btn-success" onClick={() => onNav('results')}>
+              <Icon name="award" size={14}/> Finish & see results
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExamPage({ onNav }) {
+  const [timeLeft, setTimeLeft] = useState(90 * 60);
+  const [answers, setAnswers] = useState({});
+  const [submitted, setSubmitted] = useState(false);
+  const [current, setCurrent] = useState(0);
+
+  useEffect(() => {
+    if (submitted) return;
+    const t = setInterval(() => setTimeLeft(s => s <= 0 ? 0 : s - 1), 1000);
+    return () => clearInterval(t);
+  }, [submitted]);
+
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  const isWarning = timeLeft < 600;
+  const answered = Object.keys(answers).length;
+  const q = mockExamQuestions[current];
+
+  if (submitted) return <ResultsPage onNav={onNav} fromExam/>;
+
+  return (
+    <div className="page fade-up" style={{ height:'calc(100vh - 64px)', overflow:'hidden', display:'flex', flexDirection:'column' }}>
+      {/* Exam header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', paddingBottom:16, borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+        <div>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:20, fontWeight:700 }}>Mock Exam – Operating Systems</h1>
+          <p style={{ fontSize:13, color:'var(--txt-muted)' }}>Answer all questions · Use your knowledge and revision notes</p>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:20 }}>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:2 }}>Time remaining</div>
+            <div className={`timer ${isWarning ? 'warning' : ''}`}>
+              {String(mins).padStart(2,'0')}:{String(secs).padStart(2,'0')}
+            </div>
+          </div>
+          <div style={{ textAlign:'center' }}>
+            <div style={{ fontSize:11, color:'var(--txt-muted)', marginBottom:2 }}>Answered</div>
+            <div style={{ fontSize:20, fontWeight:700, color: answered === mockExamQuestions.length ? 'var(--success)' : 'var(--txt)' }}>
+              {answered}/{mockExamQuestions.length}
+            </div>
+          </div>
+          <button className="btn btn-primary" onClick={() => setSubmitted(true)}>
+            <Icon name="send" size={14}/> Submit exam
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex:1, display:'flex', gap:20, overflow:'hidden', paddingTop:16 }}>
+        {/* Question navigator */}
+        <div style={{ width:180, flexShrink:0, borderRight:'1px solid var(--border)', paddingRight:16 }}>
+          <div style={{ fontSize:12, fontWeight:600, color:'var(--txt-muted)', marginBottom:10, textTransform:'uppercase', letterSpacing:'.06em' }}>Questions</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:6, marginBottom:16 }}>
+            {mockExamQuestions.map((_, i) => (
+              <button key={i}
+                onClick={() => setCurrent(i)}
+                style={{
+                  padding:'7px', borderRadius:6, fontSize:13, fontWeight:600, border:'1px solid',
+                  background: current === i ? 'var(--primary)' : answers[i] !== undefined ? 'var(--success-dim)' : 'var(--bg-raise)',
+                  borderColor: current === i ? 'var(--primary)' : answers[i] !== undefined ? 'var(--success)' : 'var(--border-md)',
+                  color: current === i ? '#fff' : answers[i] !== undefined ? 'var(--success)' : 'var(--txt-muted)',
+                  cursor:'pointer'
+                }}>
+                {i+1}
+              </button>
+            ))}
+          </div>
+          <div className="progress-bar">
+            <div className="progress-fill success" style={{ width:`${(answered/mockExamQuestions.length)*100}%` }}/>
+          </div>
+          <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:6 }}>{answered} of {mockExamQuestions.length} answered</div>
+        </div>
+
+        {/* Current question */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          <div className="exam-q fade-up" key={current}>
+            <div className="exam-q-num">Question {current + 1} · {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'} · {q.type === 'mcq' ? '4' : '10'} marks</div>
+            <div className="exam-q-text">{q.text}</div>
+            {q.type === 'mcq' ? (
+              q.choices.map((c, i) => (
+                <div key={i} className={`choice ${answers[current] === i ? 'selected' : ''}`}
+                  onClick={() => setAnswers(a => ({...a, [current]: i}))}>
+                  <div className="choice-label">{String.fromCharCode(65+i)}</div>
+                  <span>{c}</span>
+                </div>
+              ))
+            ) : (
+              <textarea className="input" placeholder="Write your answer here…" style={{ minHeight:160 }}
+                value={answers[current] || ''}
+                onChange={e => setAnswers(a => ({...a, [current]: e.target.value}))}/>
+            )}
+          </div>
+
+          <div style={{ display:'flex', justifyContent:'space-between', marginTop:8 }}>
+            <button className="btn btn-outline btn-sm" disabled={current === 0} onClick={() => setCurrent(c => c - 1)}>
+              <Icon name="arrowL" size={13}/> Previous
+            </button>
+            <button className="btn btn-outline btn-sm" disabled={current === mockExamQuestions.length-1} onClick={() => setCurrent(c => c + 1)}>
+              Next <Icon name="arrow" size={13}/>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultsPage({ onNav, fromExam = false }) {
+  const score = 72;
+  const topicScores = [
+    { topic:'Process Management', score:85, max:100 },
+    { topic:'CPU Scheduling', score:70, max:100 },
+    { topic:'Memory Management', score:60, max:100 },
+    { topic:'File Systems', score:75, max:100 },
+    { topic:'Synchronisation', score:68, max:100 },
+  ];
+
+  return (
+    <div className="page fade-up">
+      <div style={{ maxWidth:800, margin:'0 auto' }}>
+        <div style={{ textAlign:'center', marginBottom:36 }}>
+          <h1 style={{ fontFamily:'var(--font-display)', fontSize:32, fontWeight:700, marginBottom:8 }}>
+            {fromExam ? 'Exam Results' : 'Exercise Results'}
+          </h1>
+          <p style={{ color:'var(--txt-muted)', fontSize:15 }}>Operating Systems Mock Exam · Completed today</p>
+        </div>
+
+        <div className="card" style={{ marginBottom:24 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:40, flexWrap:'wrap' }}>
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
+              <ScoreRing score={score}/>
+              <div style={{ marginTop:12, textAlign:'center' }}>
+                <span className={`badge ${score >= 70 ? 'badge-success' : score >= 50 ? 'badge-warning' : 'badge-danger'}`} style={{ fontSize:13 }}>
+                  {score >= 70 ? '✓ Pass' : score >= 50 ? '⚠ Borderline' : '✗ Needs work'}
+                </span>
+              </div>
+            </div>
+            <div style={{ flex:1, minWidth:200 }}>
+              <div className="stat-row">
+                <span style={{ fontSize:14, color:'var(--txt-muted)' }}>Total score</span>
+                <span style={{ fontSize:15, fontWeight:600, color:'var(--txt)' }}>72 / 100</span>
+              </div>
+              <div className="stat-row">
+                <span style={{ fontSize:14, color:'var(--txt-muted)' }}>MCQ section</span>
+                <span style={{ fontSize:15, fontWeight:600, color:'var(--success)' }}>21 / 24</span>
+              </div>
+              <div className="stat-row">
+                <span style={{ fontSize:14, color:'var(--txt-muted)' }}>Short answers</span>
+                <span style={{ fontSize:15, fontWeight:600, color:'var(--accent)' }}>51 / 76</span>
+              </div>
+              <div className="stat-row">
+                <span style={{ fontSize:14, color:'var(--txt-muted)' }}>Time taken</span>
+                <span style={{ fontSize:15, fontWeight:600, color:'var(--txt)' }}>72 min</span>
+              </div>
+            </div>
+            <div style={{ flex:1, minWidth:200 }}>
+              <h4 style={{ fontSize:13, fontWeight:600, color:'var(--txt-muted)', marginBottom:12 }}>Topic breakdown</h4>
+              {topicScores.map(t => (
+                <div key={t.topic} style={{ marginBottom:10 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <span style={{ fontSize:12, color:'var(--txt)' }}>{t.topic}</span>
+                    <span style={{ fontSize:12, color: t.score >= 70 ? 'var(--success)' : t.score >= 50 ? 'var(--accent)' : 'var(--danger)' }}>{t.score}%</span>
+                  </div>
+                  <div className="progress-bar" style={{ height:5 }}>
+                    <div className="progress-fill" style={{
+                      width:`${t.score}%`,
+                      background: t.score >= 70 ? 'var(--success)' : t.score >= 50 ? 'var(--accent)' : 'var(--danger)'
+                    }}/>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid-2" style={{ marginBottom:24 }}>
+          <div className="card">
+            <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ color:'var(--danger)' }}>⚠</span> Areas to revise
+            </h3>
+            {['Memory Management (paging & segmentation)','Synchronisation (semaphores, monitors)','CPU scheduling edge cases'].map((a, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--danger)', flexShrink:0 }}/>
+                <span style={{ fontSize:13, color:'var(--txt)' }}>{a}</span>
+              </div>
+            ))}
+          </div>
+          <div className="card">
+            <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:12, display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ color:'var(--success)' }}>✓</span> Strong areas
+            </h3>
+            {['Process management fundamentals','File system concepts','Basic scheduling algorithms'].map((a, i) => (
+              <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 0', borderBottom: i < 2 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ width:6, height:6, borderRadius:'50%', background:'var(--success)', flexShrink:0 }}/>
+                <span style={{ fontSize:13, color:'var(--txt)' }}>{a}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom:24 }}>
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:10 }}>AI Recommendation</h3>
+          <p style={{ fontSize:14, color:'var(--txt-muted)', lineHeight:1.7 }}>
+            Your strongest area is process management — well done. Focus your next session on <strong style={{ color:'var(--txt)' }}>Memory Management (Chapter 3)</strong>, particularly virtual memory and the differences between paging and segmentation. For synchronisation, revisit the Producer-Consumer examples in the lecture notes.
+          </p>
+          <div className="source-box" style={{ marginTop:12 }}>
+            <strong>Based on</strong>Your answers compared to OS Past Paper 2023 marking scheme · Lecture Notes reference material
+          </div>
+        </div>
+
+        <div style={{ display:'flex', gap:12, flexWrap:'wrap' }}>
+          <button className="btn btn-primary btn-lg" onClick={() => onNav('chapter')}>
+            <Icon name="book" size={15}/> Study Chapter 3 – Memory
+          </button>
+          <button className="btn btn-outline" onClick={() => onNav('exam')}>
+            <Icon name="refresh" size={14}/> Retake exam
+          </button>
+          <button className="btn btn-outline" onClick={() => onNav('progress')}>
+            <Icon name="bar" size={14}/> View progress
+          </button>
+          <button className="btn btn-outline" onClick={() => onNav('roadmap')}>
+            <Icon name="map" size={14}/> Back to roadmap
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProgressPage({ onNav }) {
+  const maxChapters = 3;
+  return (
+    <div className="page fade-up">
+      <div style={{ marginBottom:28 }}>
+        <h1 style={{ fontFamily:'var(--font-display)', fontSize:28, fontWeight:700 }}>Your Progress</h1>
+        <p style={{ color:'var(--txt-muted)', fontSize:14, marginTop:4 }}>Track your revision across all study plans</p>
+      </div>
+
+      <div className="grid-4" style={{ marginBottom:28 }}>
+        {[
+          { label:'Study streak', value:'5 days', icon:'⚡', c:'var(--accent)' },
+          { label:'Total hours', value:'14h 22m', icon:'⏱', c:'var(--primary)' },
+          { label:'Avg exam score', value:'71%', icon:'📊', c:'var(--success)' },
+          { label:'Chapters left', value:'5', icon:'📘', c:'#A855F7' },
+        ].map(s => (
+          <div className="card" key={s.label}>
+            <div style={{ fontSize:28, marginBottom:8 }}>{s.icon}</div>
+            <div style={{ fontSize:24, fontWeight:700, fontFamily:'var(--font-display)', color:s.c }}>{s.value}</div>
+            <div style={{ fontSize:12, color:'var(--txt-muted)', marginTop:2 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid-2" style={{ marginBottom:24 }}>
+        <div className="card">
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:16 }}>Weekly activity</h3>
+          <div style={{ display:'flex', alignItems:'flex-end', gap:8, height:120, paddingBottom:24, position:'relative' }}>
+            {mockProgress.map((d, i) => (
+              <div key={i} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:4, height:'100%', justifyContent:'flex-end' }}>
+                <div style={{ width:'100%', background:'var(--primary-dim)', borderRadius:'4px 4px 0 0',
+                  height:`${((d.chapters + d.exercises/8) / (maxChapters + 3)) * 80}%`,
+                  minHeight:4, border:'1px solid var(--primary-mid)', position:'relative' }}>
+                  {d.score && (
+                    <div style={{ position:'absolute', top:-20, left:'50%', transform:'translateX(-50%)', fontSize:10, color:'var(--accent)', fontWeight:600, whiteSpace:'nowrap' }}>
+                      {d.score}%
+                    </div>
+                  )}
+                </div>
+                <span style={{ fontSize:11, color:'var(--txt-muted)' }}>{d.date}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display:'flex', gap:12, fontSize:12, color:'var(--txt-muted)' }}>
+            <span><span style={{ display:'inline-block', width:10, height:10, background:'var(--primary-dim)', border:'1px solid var(--primary)', borderRadius:2, marginRight:4 }}/>Chapters + exercises</span>
+            <span style={{ color:'var(--accent)' }}>● Mock exam score</span>
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:16 }}>Chapter completion</h3>
+          {mockChapters.map(ch => (
+            <div key={ch.id} style={{ marginBottom:12 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+                <span style={{ fontSize:13, color:'var(--txt)', display:'flex', alignItems:'center', gap:8 }}>
+                  <span className={`status-dot ${ch.status}`}/>
+                  Ch {ch.orderIndex}. {ch.title.split('&')[0].trim()}
+                </span>
+                <span style={{ fontSize:12, color: ch.status === 'done' ? 'var(--success)' : ch.status === 'current' ? 'var(--primary)' : 'var(--txt-sub)' }}>
+                  {ch.status === 'done' ? '100%' : ch.status === 'current' ? '45%' : '0%'}
+                </span>
+              </div>
+              <div className="progress-bar" style={{ height:5 }}>
+                <div className="progress-fill" style={{
+                  width: ch.status === 'done' ? '100%' : ch.status === 'current' ? '45%' : '0%',
+                  background: ch.status === 'done' ? 'var(--success)' : 'var(--primary)'
+                }}/>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 style={{ fontFamily:'var(--font-display)', fontSize:17, marginBottom:16 }}>Exam history</h3>
+        <div style={{ overflowX:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:14 }}>
+            <thead>
+              <tr style={{ borderBottom:'1px solid var(--border)' }}>
+                {['Exam','Date','MCQ','Short answer','Total','Grade'].map(h => (
+                  <th key={h} style={{ textAlign:'left', padding:'8px 12px', fontSize:12, fontWeight:600, color:'var(--txt-muted)', textTransform:'uppercase', letterSpacing:'.05em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { name:'Mock Exam 1 – OS', date:'Apr 11', mcq:'18/24', sa:'54/76', total:72, grade:'Pass' },
+                { name:'Mock Exam 2 – DS', date:'Apr 8', mcq:'22/24', sa:'64/76', total:86, grade:'Distinction' },
+                { name:'Ch.1 Quick Quiz', date:'Apr 6', mcq:'9/10', sa:'—', total:90, grade:'Distinction' },
+              ].map((e, i) => (
+                <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
+                  <td style={{ padding:'12px 12px', color:'var(--txt)', fontWeight:500 }}>{e.name}</td>
+                  <td style={{ padding:'12px', color:'var(--txt-muted)' }}>{e.date}</td>
+                  <td style={{ padding:'12px', color:'var(--txt)' }}>{e.mcq}</td>
+                  <td style={{ padding:'12px', color:'var(--txt)' }}>{e.sa}</td>
+                  <td style={{ padding:'12px' }}>
+                    <ScoreRing score={e.total} size={44}/>
+                  </td>
+                  <td style={{ padding:'12px' }}>
+                    <span className={`badge ${e.total >= 70 ? 'badge-success' : 'badge-warning'}`}>{e.grade}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Shell & Navigation ─────────────────────────────── */
+const navItems = [
+  { id:'dashboard', label:'Dashboard', icon:'home', group:'main' },
+  { id:'upload', label:'Upload docs', icon:'upload', group:'main' },
+  { id:'roadmap', label:'Study roadmap', icon:'map', group:'study' },
+  { id:'chapter', label:'Chapter study', icon:'book', group:'study' },
+  { id:'exercises', label:'Exercises', icon:'pen', group:'study' },
+  { id:'exam', label:'Mock exam', icon:'award', group:'study' },
+  { id:'results', label:'Results', icon:'star', group:'study' },
+  { id:'progress', label:'Progress', icon:'bar', group:'study' },
+];
+
+function AppShell({ screen, onNav, children }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const titles = {
+    dashboard:'Dashboard', upload:'Upload material', roadmap:'Study roadmap',
+    chapter:'Chapter study', exercises:'Exercises', exam:'Mock exam',
+    results:'Results', progress:'Progress',
+  };
+
+  return (
+    <div className="app-shell">
+      <div className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
+        <div className="sidebar-logo">
+          <div className="logo-icon">P</div>
+          <span className="logo-text">PassExamAI</span>
+        </div>
+        <div className="sidebar-nav">
+          <div className="nav-section-label">Overview</div>
+          {navItems.filter(n => n.group === 'main').map(n => (
+            <button key={n.id} className={`nav-item ${screen === n.id ? 'active' : ''}`}
+              onClick={() => { onNav(n.id); setSidebarOpen(false); }}>
+              <span className="nav-icon"><Icon name={n.icon} size={16}/></span>
+              {n.label}
+            </button>
+          ))}
+          <div className="nav-section-label" style={{ marginTop:4 }}>Study flow</div>
+          {navItems.filter(n => n.group === 'study').map(n => (
+            <button key={n.id} className={`nav-item ${screen === n.id ? 'active' : ''}`}
+              onClick={() => { onNav(n.id); setSidebarOpen(false); }}>
+              <span className="nav-icon"><Icon name={n.icon} size={16}/></span>
+              {n.label}
+              {n.id === 'exercises' && <span className="nav-badge">5</span>}
+            </button>
+          ))}
+        </div>
+        <div className="sidebar-footer">
+          <div className="sidebar-user">
+            <div className="user-avatar">AJ</div>
+            <div className="user-info">
+              <div className="user-name">Alex Johnson</div>
+              <div className="user-role">Student · Free plan</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="main-content">
+        <div className="top-bar">
+          <button className="mobile-menu-btn" onClick={() => setSidebarOpen(o => !o)}>
+            <Icon name="menu" size={18}/>
+          </button>
+          <span className="top-bar-title">{titles[screen] || ''}</span>
+          <div className="top-bar-actions">
+            <button className="btn btn-icon btn-ghost"><Icon name="info" size={16}/></button>
+            <button className="btn btn-icon btn-ghost"><Icon name="settings" size={16}/></button>
+          </div>
+        </div>
+        {children}
+      </div>
+      {sidebarOpen && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.5)', zIndex:99 }} onClick={() => setSidebarOpen(false)}/>
+      )}
+    </div>
+  );
+}
+
+/* ─── App root ───────────────────────────────────────── */
+function App() {
+  const [screen, setScreen] = useState('landing');
+
+  const authScreens = ['landing', 'login', 'signup'];
+  const isAuth = authScreens.includes(screen);
+
+  if (screen === 'landing') return <Landing onNav={setScreen}/>;
+  if (screen === 'login') return <Auth mode="login" onNav={setScreen}/>;
+  if (screen === 'signup') return <Auth mode="signup" onNav={setScreen}/>;
+
+  return (
+    <AppShell screen={screen} onNav={setScreen}>
+      {screen === 'dashboard' && <Dashboard onNav={setScreen}/>}
+      {screen === 'upload' && <UploadPage onNav={setScreen}/>}
+      {screen === 'roadmap' && <RoadmapPage onNav={setScreen}/>}
+      {screen === 'chapter' && <ChapterPage onNav={setScreen}/>}
+      {screen === 'exercises' && <ExercisePage onNav={setScreen}/>}
+      {screen === 'exam' && <ExamPage onNav={setScreen}/>}
+      {screen === 'results' && <ResultsPage onNav={setScreen}/>}
+      {screen === 'progress' && <ProgressPage onNav={setScreen}/>}
+    </AppShell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
