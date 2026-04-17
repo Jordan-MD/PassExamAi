@@ -1,4 +1,6 @@
 import logging
+import json
+import time
 from typing import Optional
 import fitz  # PyMuPDF
 
@@ -9,6 +11,23 @@ from app.rag.embeddings import embed_chunks
 from app.schemas.documents import DocumentChunk
 
 logger = logging.getLogger(__name__)
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    # region agent log
+    try:
+        with open("/home/bedane/dev/Projects AI/passexamai/.cursor/debug-a1f71d.log", "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "sessionId": "a1f71d",
+                "runId": "run1",
+                "hypothesisId": hypothesis_id,
+                "location": location,
+                "message": message,
+                "data": data,
+                "timestamp": int(time.time() * 1000),
+            }, ensure_ascii=True) + "\n")
+    except Exception:
+        pass
+    # endregion
 
 
 # ─────────────────────────────────────────────
@@ -196,19 +215,17 @@ async def run_ingestion_pipeline(
     """
     Pipeline : storage_url → parse → chunk → embed → pgvector.
     Lancé en BackgroundTask — non bloquant.
-
-    Statuts possibles :
-     - parsing / chunking / embedding (en cours)
-     - text_extracted  : texte OK, embeddings en attente ou échoués
-     - ready           : pipeline complet (texte + embeddings)
-     - failed          : parsing échoué, aucun texte extrait
     """
     logger.info(f"🚀 Ingestion démarrée: document_id={document_id}, file={filename}")
+    _debug_log("H5", "ingestion.py:223", "run_ingestion_pipeline_start", {
+        "document_id": document_id,
+        "project_id": project_id,
+        "source_type": source_type,
+        "filename_len": len(filename),
+    })
 
-    # ══════════════════════════════════════════════════════════
-    # PHASE 1 : Extraction du texte (critique — permet la roadmap)
-    # ══════════════════════════════════════════════════════════
     try:
+        # ── ÉTAPE 1 : Parsing ──────────────────────────────
         update_document_status(document_id, "parsing")
         extracted_text = await parse_pdf(storage_url)
 
@@ -220,24 +237,20 @@ async def run_ingestion_pipeline(
             "extracted_text": extracted_text[:50000],
         }).eq("id", document_id).execute()
 
-        # ✅ Texte extrait — la roadmap peut déjà être générée
-        update_document_status(document_id, "text_extracted")
-        logger.info(
-            f"✅ Texte extrait pour {document_id} ({len(extracted_text)} chars) "
-            f"— roadmap possible dès maintenant"
-        )
+        # Business rule: the reference exam is only used to build roadmap prompts.
+        # It does not need vectorization and should bypass embedding/pgvector steps.
+        if source_type == "exam":
+            _debug_log("H5", "ingestion.py:252", "run_ingestion_pipeline_exam_bypass_embeddings", {
+                "document_id": document_id,
+                "source_type": source_type,
+            })
+            update_document_status(document_id, "ready", chunks_count=0)
+            logger.info(f"✅ Ingestion terminée (exam sans embedding): {document_id}")
+            return
 
-    except Exception as e:
-        error_msg = str(e)
-        logger.error(f"❌ Extraction échouée pour {document_id}: {error_msg}")
-        update_document_status(document_id, "failed", error_message=error_msg)
-        return  # Arrêt total — pas de texte = rien à faire
-
-    # ══════════════════════════════════════════════════════════
-    # PHASE 2 : Embeddings + pgvector (optionnel — enrichit le RAG)
-    # ══════════════════════════════════════════════════════════
-    try:
+        # ── ÉTAPE 2 : Chunking ─────────────────────────────
         update_document_status(document_id, "chunking")
+
         chunks = chunk_text(
             text=extracted_text,
             document_id=document_id,
@@ -251,26 +264,32 @@ async def run_ingestion_pipeline(
 
         logger.info(f"Chunking OK: {len(chunks)} chunks pour {filename}")
 
+        # ── ÉTAPE 3 : Embeddings ───────────────────────────
         update_document_status(document_id, "embedding")
+        _debug_log("H4", "ingestion.py:257", "run_ingestion_pipeline_before_embeddings", {
+            "document_id": document_id,
+            "chunks_count": len(chunks),
+        })
         embedded_chunks = await embed_chunks(chunks)
 
+        # ── ÉTAPE 4 : Stockage pgvector ────────────────────
         chunks_count = await store_chunks_in_pgvector(
             chunks=embedded_chunks,
             document_id=document_id,
         )
 
-        # ✅ Pipeline complet — RAG pleinement fonctionnel
+        # ── SUCCÈS ─────────────────────────────────────────
         update_document_status(document_id, "ready", chunks_count=chunks_count)
         logger.info(
-            f"✅ Ingestion complète: {document_id} → {chunks_count} chunks (file={filename})"
+            f"✅ Ingestion terminée: {document_id} → {chunks_count} chunks (file={filename})"
         )
 
     except Exception as e:
-        # L'embedding a échoué, MAIS le texte est extrait
-        # → on garde "text_extracted" pour que la roadmap fonctionne
-        error_msg = f"Embedding échoué (texte disponible): {e}"
-        logger.warning(f"⚠️  {error_msg} pour {document_id}")
-        update_document_status(
-            document_id, "text_extracted",
-            error_message=str(e)[:500],
-        )
+        error_msg = str(e)
+        logger.error(f"❌ Ingestion échouée pour {document_id}: {error_msg}")
+        _debug_log("H4", "ingestion.py:275", "run_ingestion_pipeline_failed", {
+            "document_id": document_id,
+            "exc_type": type(e).__name__,
+            "error": error_msg[:300],
+        })
+        update_document_status(document_id, "failed", error_message=error_msg)

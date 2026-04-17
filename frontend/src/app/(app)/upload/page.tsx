@@ -1,8 +1,9 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
 import { projectsApi, documentsApi, sourcesApi } from "@/lib/api";
+import type { DocumentStatus, UserSource } from "@/types";
 import Icon from "@/components/ui/Icon";
 
 type Step = "project" | "files" | "done";
@@ -14,14 +15,30 @@ export default function UploadPage() {
     deadline: "", hours_per_day: "2", days_per_week: "5",
   });
   const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
-  const [files, setFiles] = useState<File[]>([]);
+  const [examFiles, setExamFiles] = useState<File[]>([]);
+  const [sourceFiles, setSourceFiles] = useState<File[]>([]);
   const [links, setLinks] = useState<string[]>([""]);
   const [uploading, setUploading] = useState(false);
-  const [uploadedDocs, setUploadedDocs] = useState<string[]>([]);
+  const [tracking, setTracking] = useState(false);
+  const [uploadedDocs, setUploadedDocs] = useState<
+    { id: string; filename: string; kind: "exam" | "source"; status: DocumentStatus; error?: string }[]
+  >([]);
+  const [uploadedLinks, setUploadedLinks] = useState<
+    { id: string; url: string; status: string; error?: string }[]
+  >([]);
   const [error, setError] = useState("");
-  const [drag, setDrag] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragExam, setDragExam] = useState(false);
+  const [dragSource, setDragSource] = useState(false);
+  const examFileInputRef = useRef<HTMLInputElement>(null);
+  const sourceFileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const terminalDocumentStatuses: DocumentStatus[] = ["ready", "failed"];
+
+  const isDoneTracking = useMemo(() => {
+    const docsDone = uploadedDocs.every((d) => terminalDocumentStatuses.includes(d.status));
+    const linksDone = uploadedLinks.every((s) => ["ready", "failed"].includes(s.status));
+    return uploadedDocs.length + uploadedLinks.length > 0 && docsDone && linksDone;
+  }, [uploadedDocs, uploadedLinks]);
 
   // ── Step 1: Create project ──
   const handleCreateProject = async (e: React.FormEvent) => {
@@ -44,59 +61,105 @@ export default function UploadPage() {
   };
 
   // ── Step 2: Upload files ──
-  const handleDrop = (e: React.DragEvent) => {
+  const filterAcceptedFiles = (items: File[]) =>
+    items.filter((f) => f.type === "application/pdf" || f.type === "text/plain");
+
+  const handleDrop = (e: React.DragEvent, kind: "exam" | "source") => {
     e.preventDefault();
-    setDrag(false);
-    const dropped = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type === "application/pdf" || f.type === "text/plain"
-    );
-    setFiles((prev) => [...prev, ...dropped]);
+    const dropped = filterAcceptedFiles(Array.from(e.dataTransfer.files));
+    if (kind === "exam") {
+      setDragExam(false);
+      setExamFiles((prev) => [...prev, ...dropped]);
+      return;
+    }
+    setDragSource(false);
+    setSourceFiles((prev) => [...prev, ...dropped]);
   };
 
-  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(e.target.files || []);
-    setFiles((prev) => [...prev, ...picked]);
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>, kind: "exam" | "source") => {
+    const picked = filterAcceptedFiles(Array.from(e.target.files || []));
+    if (kind === "exam") {
+      setExamFiles((prev) => [...prev, ...picked]);
+      return;
+    }
+    setSourceFiles((prev) => [...prev, ...picked]);
   };
 
   const handleUploadAll = async () => {
     if (!createdProjectId) return;
+    if (examFiles.length === 0) {
+      setError("You must upload at least one reference exam before continuing.");
+      return;
+    }
     setUploading(true);
     setError("");
+    setTracking(false);
+    setUploadedDocs([]);
+    setUploadedLinks([]);
 
     try {
       const supabase = getSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Upload each file to Supabase Storage then ingest
-      for (const file of files) {
+      // Upload exam files first (mandatory)
+      for (const file of examFiles) {
         const path = `${user.id}/${createdProjectId}/${Date.now()}_${file.name}`;
-        const { data, error: storageError } = await supabase.storage
+        const { error: storageError } = await supabase.storage
           .from("documents")
           .upload(path, file, { upsert: false });
         if (storageError) throw storageError;
 
         const { data: signedData, error: signedError } = await supabase.storage
-      .from("documents")
-  .createSignedUrl(path, 3600);
-      if (signedError) throw signedError;
-        const storageUrl = signedData.signedUrl;
+          .from("documents")
+          .createSignedUrl(path, 3600);
+        if (signedError) throw signedError;
 
         const res = await documentsApi.ingest({
-          storage_url: storageUrl,
+          storage_url: signedData.signedUrl,
           filename: file.name,
           project_id: createdProjectId,
           source_type: "exam",
         });
-        setUploadedDocs((prev) => [...prev, res.document_id]);
+        setUploadedDocs((prev) => [
+          ...prev,
+          { id: res.document_id, filename: file.name, kind: "exam", status: res.status },
+        ]);
       }
 
-      // Add links
+      // Upload optional source files
+      for (const file of sourceFiles) {
+        const path = `${user.id}/${createdProjectId}/${Date.now()}_${file.name}`;
+        const { error: storageError } = await supabase.storage
+          .from("documents")
+          .upload(path, file, { upsert: false });
+        if (storageError) throw storageError;
+
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from("documents")
+          .createSignedUrl(path, 3600);
+        if (signedError) throw signedError;
+
+        const res = await documentsApi.ingest({
+          storage_url: signedData.signedUrl,
+          filename: file.name,
+          project_id: createdProjectId,
+          source_type: "reference",
+        });
+        setUploadedDocs((prev) => [
+          ...prev,
+          { id: res.document_id, filename: file.name, kind: "source", status: res.status },
+        ]);
+      }
+
+      // Add optional links
       for (const link of links.filter((l) => l.trim())) {
-        await sourcesApi.add({ url: link.trim(), project_id: createdProjectId });
+        const source = await sourcesApi.add({ url: link.trim(), project_id: createdProjectId });
+        setUploadedLinks((prev) => [...prev, { id: source.source_id, url: link.trim(), status: source.status }]);
       }
 
       setStep("done");
+      setTracking(true);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -104,20 +167,98 @@ export default function UploadPage() {
     }
   };
 
+  useEffect(() => {
+    if (!tracking || !createdProjectId) return;
+
+    const poll = async () => {
+      try {
+        if (uploadedDocs.length > 0) {
+          const updated = await Promise.all(
+            uploadedDocs.map(async (doc) => {
+              const res = await documentsApi.getStatus(doc.id);
+              return {
+                ...doc,
+                status: res.status,
+                error: res.error_message,
+              };
+            })
+          );
+          setUploadedDocs(updated);
+        }
+
+        if (uploadedLinks.length > 0) {
+          const updatedLinks = await Promise.all(
+            uploadedLinks.map(async (src) => {
+              const res = await sourcesApi.getStatus(src.id);
+              const typed = res as UserSource;
+              return {
+                ...src,
+                status: typed.status,
+                error: typed.error_message,
+              };
+            })
+          );
+          setUploadedLinks(updatedLinks);
+        }
+      } catch (e: any) {
+        setError(e.message || "Unable to refresh ingestion status.");
+      }
+    };
+
+    void poll();
+    const interval = setInterval(() => void poll(), 2500);
+    return () => clearInterval(interval);
+  }, [tracking, createdProjectId, uploadedDocs, uploadedLinks]);
+
   if (step === "done") {
+    const inProgressCount =
+      uploadedDocs.filter((d) => !terminalDocumentStatuses.includes(d.status)).length +
+      uploadedLinks.filter((s) => !["ready", "failed"].includes(s.status)).length;
+
     return (
       <div className="max-w-[600px] mx-auto animate-fade-up">
-        <div className="card text-center py-12">
+        <div className="card py-10">
           <div className="w-16 h-16 rounded-full bg-success-dim flex items-center justify-center mx-auto mb-5">
             <Icon name="check" size={32} className="text-success" />
           </div>
-          <h2 className="font-display text-[26px] font-bold mb-2">
-            Materials uploaded!
+          <h2 className="font-display text-[26px] font-bold mb-2 text-center">
+            Upload completed
           </h2>
-          <p className="text-txt-muted text-sm mb-8 leading-[1.6]">
-            Your documents are being processed. This takes 1–2 minutes.
-            You can now generate your study roadmap.
+          <p className="text-txt-muted text-sm mb-6 leading-[1.6] text-center">
+            We are tracking each ingestion step in real time. You can open the roadmap now, but generation is only available once your reference exam is ready.
           </p>
+
+          <div className="flex flex-col gap-2 mb-7">
+            {uploadedDocs.map((doc) => (
+              <div key={doc.id} className="bg-bg-surf border border-[rgba(255,255,255,0.07)] rounded-[10px] px-4 py-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-txt truncate">
+                    {doc.kind === "exam" ? "Reference exam: " : "Source file: "}
+                    {doc.filename}
+                  </span>
+                  <span className="text-txt-muted">{doc.status}</span>
+                </div>
+                {doc.error && <p className="text-danger text-xs mt-1">{doc.error}</p>}
+              </div>
+            ))}
+            {uploadedLinks.map((source) => (
+              <div key={source.id} className="bg-bg-surf border border-[rgba(255,255,255,0.07)] rounded-[10px] px-4 py-3">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-txt truncate">Web source: {source.url}</span>
+                  <span className="text-txt-muted">{source.status}</span>
+                </div>
+                {source.error && <p className="text-danger text-xs mt-1">{source.error}</p>}
+              </div>
+            ))}
+          </div>
+
+          {inProgressCount > 0 && (
+            <div className="flex items-center gap-2 text-sm text-txt-muted mb-6 justify-center">
+              <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              {inProgressCount} item(s) still processing...
+            </div>
+          )}
+
           <div className="flex gap-3 justify-center flex-wrap">
             <button
               onClick={() => router.push(`/roadmap?projectId=${createdProjectId}`)}
@@ -128,6 +269,11 @@ export default function UploadPage() {
             <button onClick={() => router.push("/dashboard")} className="btn btn-outline btn-lg">
               Dashboard
             </button>
+            {!isDoneTracking && (
+              <button onClick={() => setTracking(true)} className="btn btn-ghost btn-lg">
+                Refresh status
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -143,44 +289,103 @@ export default function UploadPage() {
           </div>
           <h2 className="font-display text-[24px] font-bold">Add your study materials</h2>
           <p className="text-txt-muted text-sm mt-1">
-            Upload PDFs or add web links. These become your RAG knowledge base.
+            Add at least one reference exam, then optionally add extra sources.
           </p>
         </div>
 
-        {/* Dropzone */}
+        <div className="mb-2">
+          <label className="label">Reference exam (required)</label>
+          <p className="text-xs text-txt-sub mb-3">
+            Mandatory: upload one or more exam papers used as the primary roadmap reference.
+          </p>
+        </div>
+
+        {/* Exam dropzone */}
         <div
-          className={`dropzone mb-5 ${drag ? "drag" : ""}`}
-          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          className={`dropzone mb-5 ${dragExam ? "drag" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragExam(true);
+          }}
+          onDragLeave={() => setDragExam(false)}
+          onDrop={(e) => handleDrop(e, "exam")}
+          onClick={() => examFileInputRef.current?.click()}
         >
           <div className="text-[40px] mb-3">📄</div>
           <h3 className="font-display text-xl mb-[6px] text-txt">
-            Drop your files here
+            Drop reference exam files here
           </h3>
           <p className="text-[13px] text-txt-muted">
-            Past exam papers, syllabuses, course notes · PDF or TXT
+            PDF or TXT only
           </p>
           <input
-            ref={fileInputRef}
+            ref={examFileInputRef}
             type="file"
             accept=".pdf,.txt"
             multiple
             className="hidden"
-            onChange={handleFilePick}
+            onChange={(e) => handleFilePick(e, "exam")}
           />
         </div>
 
-        {/* File list */}
-        {files.length > 0 && (
+        {examFiles.length > 0 && (
           <div className="flex flex-col gap-2 mb-5">
-            {files.map((f, i) => (
+            {examFiles.map((f, i) => (
               <div key={i} className="flex items-center gap-3 bg-bg-surf border border-[rgba(255,255,255,0.07)] rounded-[10px] px-4 py-3">
                 <Icon name="file" size={16} className="text-primary flex-shrink-0" />
                 <span className="text-sm text-txt flex-1 truncate">{f.name}</span>
                 <span className="text-xs text-txt-muted">{(f.size / 1024).toFixed(0)} KB</span>
-                <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                <button onClick={() => setExamFiles((prev) => prev.filter((_, j) => j !== i))}
+                  className="btn btn-icon btn-ghost w-6 h-6 text-txt-muted hover:text-danger">
+                  <Icon name="x" size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mb-2 mt-1">
+          <label className="label">Optional source files</label>
+          <p className="text-xs text-txt-sub mb-3">
+            Add notes, syllabus, or references to enrich the generated roadmap.
+          </p>
+        </div>
+
+        <div
+          className={`dropzone mb-5 ${dragSource ? "drag" : ""}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragSource(true);
+          }}
+          onDragLeave={() => setDragSource(false)}
+          onDrop={(e) => handleDrop(e, "source")}
+          onClick={() => sourceFileInputRef.current?.click()}
+        >
+          <div className="text-[40px] mb-3">🗂️</div>
+          <h3 className="font-display text-xl mb-[6px] text-txt">
+            Drop optional source files here
+          </h3>
+          <p className="text-[13px] text-txt-muted">
+            PDF or TXT only
+          </p>
+          <input
+            ref={sourceFileInputRef}
+            type="file"
+            accept=".pdf,.txt"
+            multiple
+            className="hidden"
+            onChange={(e) => handleFilePick(e, "source")}
+          />
+        </div>
+
+        {sourceFiles.length > 0 && (
+          <div className="flex flex-col gap-2 mb-5">
+            {sourceFiles.map((f, i) => (
+              <div key={i} className="flex items-center gap-3 bg-bg-surf border border-[rgba(255,255,255,0.07)] rounded-[10px] px-4 py-3">
+                <Icon name="file" size={16} className="text-primary flex-shrink-0" />
+                <span className="text-sm text-txt flex-1 truncate">{f.name}</span>
+                <span className="text-xs text-txt-muted">{(f.size / 1024).toFixed(0)} KB</span>
+                <button onClick={() => setSourceFiles((prev) => prev.filter((_, j) => j !== i))}
                   className="btn btn-icon btn-ghost w-6 h-6 text-txt-muted hover:text-danger">
                   <Icon name="x" size={14} />
                 </button>
@@ -235,12 +440,12 @@ export default function UploadPage() {
           <button
             onClick={handleUploadAll}
             className="btn btn-primary flex-1 justify-center"
-            disabled={uploading || (files.length === 0 && links.every((l) => !l.trim()))}
+            disabled={uploading || examFiles.length === 0}
           >
             {uploading ? (
               <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
             ) : (
-              <><Icon name="upload" size={15} /> Upload & continue</>
+              <><Icon name="upload" size={15} /> Upload & track progress</>
             )}
           </button>
         </div>

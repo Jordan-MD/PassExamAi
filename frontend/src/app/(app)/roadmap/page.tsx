@@ -25,15 +25,50 @@ export default function RoadmapPage() {
 
   useEffect(() => {
     if (!projectId) return;
-    Promise.all([
-      roadmapApi.list(projectId).catch(() => []),
-      documentsApi.list(projectId).catch(() => []),
-    ]).then(([roadmaps, docs]) => {
-      if (roadmaps.length > 0) setRoadmap(roadmaps[0]);
-      setDocs(docs);
-      setLoading(false);
-    });
+    let mounted = true;
+
+    const load = async () => {
+      try {
+        const [roadmaps, docs] = await Promise.all([
+          roadmapApi.list(projectId).catch(() => []),
+          documentsApi.list(projectId).catch(() => []),
+        ]);
+        if (!mounted) return;
+        if (roadmaps.length > 0) setRoadmap(roadmaps[0]);
+        setDocs(docs);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    void load();
+    return () => {
+      mounted = false;
+    };
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || docs.length === 0) return;
+    const hasProcessing = docs.some((d) =>
+      ["uploaded", "parsing", "chunking", "embedding"].includes(d.status)
+    );
+    if (!hasProcessing) return;
+
+    let mounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const refreshed = await documentsApi.list(projectId);
+        if (mounted) setDocs(refreshed);
+      } catch {
+        // Keep existing state on transient polling errors.
+      }
+    }, 2500);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [projectId, docs]);
 
   const handleGenerate = async () => {
     if (!projectId) return;
@@ -49,7 +84,8 @@ export default function RoadmapPage() {
     }
   };
 
-  const usableDocs = docs.filter((d) => d.status === "ready" || d.status === "text_extracted");
+  const readyDocs = docs.filter((d) => d.status === "ready");
+  const readyExamDocs = readyDocs.filter((d) => d.source_type === "exam");
   const processingDocs = docs.filter((d) =>
     ["parsing", "chunking", "embedding", "uploaded"].includes(d.status)
   );
@@ -66,7 +102,13 @@ export default function RoadmapPage() {
 
   return (
     <div className="max-w-[860px] animate-fade-up">
-      {/* Processing status bar */}
+      <div className="mb-4">
+        <button onClick={() => router.push("/dashboard")} className="btn btn-outline btn-sm">
+          <Icon name="arrow" size={13} /> Back to dashboard
+        </button>
+      </div>
+
+      {/* Status bar */}
       {processingDocs.length > 0 && (
         <div className="card mb-5 flex items-center gap-3 border-accent/30 bg-accent-dim">
           <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin flex-shrink-0" />
@@ -76,15 +118,18 @@ export default function RoadmapPage() {
           </p>
         </div>
       )}
-
-      {/* Failed documents warning */}
-      {failedDocs.length > 0 && usableDocs.length === 0 && (
-        <div className="card mb-5 flex items-center gap-3 border-danger/30 bg-danger-dim">
-          <Icon name="x" size={16} className="text-danger flex-shrink-0" />
-          <p className="text-sm text-txt">
-            <strong>{failedDocs.length}</strong> document(s) failed to process.
-            Please try re-uploading your files.
+      {failedDocs.length > 0 && (
+        <div className="card mb-5 border-[rgba(239,68,68,0.25)] bg-danger-dim">
+          <p className="text-sm text-danger mb-2">
+            {failedDocs.length} document(s) failed during ingestion. Roadmap generation may be incomplete.
           </p>
+          <div className="flex flex-col gap-1">
+            {failedDocs.map((doc) => (
+              <p key={doc.id} className="text-xs text-danger">
+                {doc.filename}: {doc.error_message || "Unknown ingestion error"}
+              </p>
+            ))}
+          </div>
         </div>
       )}
 
@@ -96,11 +141,9 @@ export default function RoadmapPage() {
           </div>
           <h2 className="font-display text-[24px] font-bold mb-2">Generate your roadmap</h2>
           <p className="text-txt-muted text-sm mb-6 max-w-sm mx-auto leading-[1.6]">
-            {usableDocs.length > 0
-              ? `${usableDocs.length} document(s) ready. Your AI-powered study plan is a click away.`
-              : failedDocs.length > 0
-                ? "Document processing failed. Please re-upload your files."
-                : "Upload documents first to generate your roadmap."}
+            {readyExamDocs.length > 0
+              ? `${readyExamDocs.length} reference exam(s) ready. Your AI-powered study plan is a click away.`
+              : "Upload and process at least one reference exam before generating your roadmap."}
           </p>
           {error && (
             <div className="text-danger text-sm bg-danger-dim border border-[rgba(239,68,68,0.2)] rounded-[10px] px-4 py-3 mb-4 text-left">
@@ -109,7 +152,7 @@ export default function RoadmapPage() {
           )}
           <button
             onClick={handleGenerate}
-            disabled={generating || usableDocs.length === 0}
+            disabled={generating || readyExamDocs.length === 0 || processingDocs.length > 0}
             className="btn btn-primary btn-lg"
           >
             {generating ? (

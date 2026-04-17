@@ -10,6 +10,8 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState("there");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const supabase = getSupabaseClient();
@@ -24,6 +26,22 @@ export default function DashboardPage() {
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+
+  const handleDeleteProject = async (projectId: string, title: string) => {
+    const confirmed = window.confirm(`Delete "${title}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingId(projectId);
+    setError("");
+    try {
+      await projectsApi.delete(projectId);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    } catch (e: any) {
+      setError(e.message || "Unable to delete this project.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const stats = [
     { label: "Study projects", value: projects.length, icon: "layers", color: "#4F7EF5" },
@@ -63,6 +81,11 @@ export default function DashboardPage() {
 
       {/* Projects */}
       <h2 className="font-display text-xl mb-4">Your study plans</h2>
+      {error && (
+        <div className="text-danger text-sm bg-danger-dim border border-[rgba(239,68,68,0.2)] rounded-[10px] px-4 py-3 mb-4">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="flex flex-col gap-3">
@@ -84,11 +107,7 @@ export default function DashboardPage() {
       ) : (
         <div className="flex flex-col gap-[14px]">
           {projects.map((p) => (
-            <Link
-              href={`/roadmap?projectId=${p.id}`}
-              key={p.id}
-              className="card card-hover flex items-center gap-5 no-underline"
-            >
+            <div key={p.id} className="card card-hover flex items-center gap-5">
               <div className="w-12 h-12 rounded-xl bg-primary-dim flex items-center justify-center flex-shrink-0">
                 <Icon name="book" size={22} className="text-primary" />
               </div>
@@ -111,12 +130,31 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
-              <div className="flex-shrink-0">
-                <span className="btn btn-outline btn-sm">
+              <div className="flex-shrink-0 flex items-center gap-2 flex-wrap justify-end">
+                <Link href={`/roadmap?projectId=${p.id}`} className="btn btn-outline btn-sm">
                   Continue <Icon name="arrow" size={13} />
-                </span>
+                </Link>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  title="Project editing will be added in the next iteration."
+                >
+                  <Icon name="pen" size={13} /> Edit soon
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm text-danger"
+                  onClick={() => void handleDeleteProject(p.id, p.title)}
+                  disabled={deletingId === p.id}
+                >
+                  {deletingId === p.id ? (
+                    <><span className="inline-block w-3 h-3 border-2 border-danger/30 border-t-danger rounded-full animate-spin" /> Deleting…</>
+                  ) : (
+                    <><Icon name="x" size={13} /> Delete</>
+                  )}
+                </button>
               </div>
-            </Link>
+            </div>
           ))}
         </div>
       )}

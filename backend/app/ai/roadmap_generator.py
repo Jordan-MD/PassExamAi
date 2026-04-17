@@ -137,29 +137,33 @@ async def generate_roadmap(
     logger.info(f"Génération roadmap pour projet {project_id}")
 
     # ── 1. Récupère le contenu du document depuis la DB ──
-    # La roadmap n'a besoin que du texte extrait, pas des embeddings.
-    # On accepte "ready" (pipeline complet) ET "text_extracted" (texte OK, embeddings échoués).
     doc_result = (
         supabase.table("uploaded_documents")
-        .select("id, extracted_text, filename")
+        .select("id, extracted_text, filename, status")
         .eq("project_id", project_id)
-        .in_("status", ["ready", "text_extracted"])
         .order("created_at", desc=True)
-        .limit(1)
+        .limit(10)
         .execute()
     )
 
     if not doc_result.data:
         raise ValueError(
-            "No document with extracted text found for this project. "
-            "Please upload a document and wait for text extraction to complete."
+            "No document found for this project. Please upload and ingest a file first."
         )
 
-    doc = doc_result.data[0]
-    extracted_text = doc.get("extracted_text", "")
+    # Roadmap depends on extracted_text, not on pgvector embeddings.
+    # Keep supporting generation even if embedding/pgvector step failed.
+    doc = next(
+        (d for d in doc_result.data if (d.get("extracted_text") or "").strip()),
+        None,
+    )
+    if not doc:
+        raise ValueError(
+            "No extracted text available yet for this project. "
+            "Wait for parsing to finish and retry."
+        )
 
-    if not extracted_text:
-        raise ValueError("Document text is empty — ingestion may be incomplete.")
+    extracted_text = doc["extracted_text"]
 
     # ── 2. Vérification cache ────────────────────────────
     content_hash = _compute_content_hash(extracted_text)
