@@ -19,11 +19,15 @@ class ExamQuestionSchema(BaseModel):
 class ExamSchema(BaseModel):
     id: Optional[uuid.UUID] = None
     roadmap_id: uuid.UUID
-    title: str
-    time_limit: Optional[int] = None      # Minutes
-    question_count: int = 10
+    # NEW: Link to a specific chapter for Mini-Exams
+    chapter_id: Optional[uuid.UUID] = None 
+    title: str # e.g., "Mini-Exam: Chapter 1"
+    time_limit: Optional[int] = None # Minutes
+    question_count: int = 5 # Mini-exams are usually shorter
     questions: List[ExamQuestionSchema] = []
-
+    
+    # Logic: If chapter_id is set, this is a requirement to pass the chapter.
+    is_mini_exam: bool = False
 
 class ExamGenerateRequest(BaseModel):
     roadmap_id: uuid.UUID

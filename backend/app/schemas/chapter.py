@@ -14,4 +14,7 @@ class ChapterSchema(BaseModel):
     importance: float = Field(default=1.0, ge=0.0, le=3.0)
     lessons: List[LessonSchema] = []
     status: ChapterStatus = "locked"
-    
+# NEW: Tracking the evaluation
+    mini_exam_id: Optional[uuid.UUID] = None
+    last_exam_score: Optional[float] = None # Score obtained by the student
+    passing_score: float = 70.0 # Required score to unlock next chapter    

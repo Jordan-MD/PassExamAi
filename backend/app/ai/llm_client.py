@@ -60,10 +60,7 @@ async def llm_complete(
 
 
 async def get_embeddings(texts: list[str]) -> list[list[float]]:
-    """
-    Génère des embeddings via OpenAI text-embedding-3-small.
-    Retourne une liste de vecteurs 1536 dimensions.
-    """
+
     try:
         response = await aembedding(
             model=settings.model_embeddings,
