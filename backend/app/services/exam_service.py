@@ -99,16 +99,14 @@ class ExamService:
         data = ExamService._assert_exam_ownership(exam_id, user_id)
         return ExamService._db_to_schema(data)
 
+# ── Corrections dans submit() ──────────────────────────────────────────────
+
     @staticmethod
     async def submit(
         exam_id: str,
         user_id: str,
-        answers: list,
+        answers: list,          # list[SubmitAnswerItem] — Pydantic model avec .question_id / .answer
     ) -> ExamResult:
-        """
-        Score chaque réponse, génère le feedback global, sauvegarde la soumission.
-        Retourne l'ExamResult complet.
-        """
         ExamService._assert_exam_ownership(exam_id, user_id)
 
         questions_result = (
@@ -121,24 +119,44 @@ class ExamService:
         if not questions:
             raise ValueError("Aucune question trouvée pour cet examen")
 
+    # ✅ Batch : charge tous les titres de chapitres en une seule requête
+        chapter_ids = {
+            q.get("chapter_id")
+            for q in questions.values()
+            if q.get("chapter_id")
+        }
+        chapter_titles: dict[str, str] = {}
+        if chapter_ids:
+            ch_result = (
+                supabase.table("chapters")
+                .select("id, title")
+                .in_("id", list(chapter_ids))
+                .execute()
+            )
+            chapter_titles = {
+                row["id"]: row["title"]
+                for row in (ch_result.data or [])
+            }
+
         total_score = 0.0
         max_score = 0.0
         chapter_scores: dict[str, dict] = {}
 
         for item in answers:
-            q = questions.get(item.question_id)
+            # ✅ Accès uniforme : .question_id fonctionne si item est un Pydantic model
+            q = questions.get(str(item.question_id))
             if not q:
                 continue
 
             max_pts = float(q.get("points", 1.0))
             max_score += max_pts
-            chapter_id = q.get("chapter_id") or "unknown"
+            chapter_id = str(q.get("chapter_id") or "unknown")
 
             if chapter_id not in chapter_scores:
                 chapter_scores[chapter_id] = {
                     "score": 0.0,
                     "max": 0.0,
-                    "title": ExamService._get_chapter_title(chapter_id),
+                    "title": chapter_titles.get(chapter_id, ""),  # ✅ depuis le batch
                 }
             chapter_scores[chapter_id]["max"] += max_pts
 
@@ -183,6 +201,7 @@ class ExamService:
             percentage=round(percentage, 1),
             section_scores=section_scores,
             feedback=feedback,
+            passed=percentage >= 70.0,  # ✅ champ peuplé
         )
 
     # ── Private helpers ───────────────────────────────────

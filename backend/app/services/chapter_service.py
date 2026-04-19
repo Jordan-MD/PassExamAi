@@ -72,7 +72,9 @@ class ChapterService:
         user_id: str,
         use_web_enrichment: bool = True,
     ) -> LessonSchema:
-        chapter, project_id = ChapterService.get_chapter_with_project(chapter_id, user_id)
+        chapter, project_id = ChapterService.get_chapter_with_project(
+            chapter_id, user_id
+        )
 
         # Met à jour le statut en in_progress
         ChapterService._mark_in_progress(chapter_id, user_id)
@@ -96,7 +98,9 @@ class ChapterService:
         Prépare la liste de messages enrichis (RAG + web) pour le LLM.
         Séparé du streaming pour faciliter les tests unitaires.
         """
-        chapter, project_id = ChapterService.get_chapter_with_project(chapter_id, user_id)
+        chapter, project_id = ChapterService.get_chapter_with_project(
+            chapter_id, user_id
+        )
         chapter_title = chapter["title"]
 
         # Query rewriting
@@ -188,7 +192,9 @@ class ChapterService:
         count: int = 5,
         types: Optional[list[str]] = None,
     ) -> list:
-        chapter, project_id = ChapterService.get_chapter_with_project(chapter_id, user_id)
+        chapter, project_id = ChapterService.get_chapter_with_project(
+            chapter_id, user_id
+        )
 
         # Cache : exercices déjà générés ?
         existing = (
@@ -211,7 +217,9 @@ class ChapterService:
     # ── Grading ───────────────────────────────────────────
 
     @staticmethod
-    async def grade(exercise_id: str, user_id: str, student_answer: str) -> GradingResult:
+    async def grade(
+        exercise_id: str, user_id: str, student_answer: str
+    ) -> GradingResult:
         return await grade_answer(
             exercise_id=exercise_id,
             user_id=user_id,
@@ -234,12 +242,17 @@ class ChapterService:
         current_order = current.data["order_index"]
         roadmap_id = current.data["roadmap_id"]
 
-        supabase.table("chapters").update({"status": "completed"}).eq("id", chapter_id).execute()
-        supabase.table("progress").upsert({
-            "user_id": user_id,
-            "chapter_id": chapter_id,
-            "completion_status": "completed",
-        }, on_conflict="user_id,chapter_id").execute()
+        supabase.table("chapters").update({"status": "completed"}).eq(
+            "id", chapter_id
+        ).execute()
+        supabase.table("progress").upsert(
+            {
+                "user_id": user_id,
+                "chapter_id": chapter_id,
+                "completion_status": "completed",
+            },
+            on_conflict="user_id,chapter_id",
+        ).execute()
 
         # Déverrouille le chapitre suivant
         next_ch = (
@@ -261,13 +274,115 @@ class ChapterService:
 
     # ── Private helpers ───────────────────────────────────
 
-    @staticmethod
-    def _mark_in_progress(chapter_id: str, user_id: str) -> None:
-        supabase.table("chapters").update({"status": "in_progress"}).eq(
-            "id", chapter_id
-        ).execute()
-        supabase.table("progress").upsert({
+    # ── Fix 1 : _mark_in_progress ne régresse plus un chapitre terminé ─────────
+
+
+@staticmethod
+def _mark_in_progress(chapter_id: str, user_id: str) -> None:
+    """Ne régresse pas un chapitre déjà 'completed'."""
+    current = (
+        supabase.table("chapters")
+        .select("status")
+        .eq("id", chapter_id)
+        .single()
+        .execute()
+    )
+    # ✅ On ne touche pas un chapitre déjà terminé
+    if current.data and current.data.get("status") == "completed":
+        return
+
+    supabase.table("chapters").update({"status": "in_progress"}).eq(
+        "id", chapter_id
+    ).execute()
+    supabase.table("progress").upsert(
+        {
             "user_id": user_id,
             "chapter_id": chapter_id,
             "completion_status": "in_progress",
-        }, on_conflict="user_id,chapter_id").execute()
+        },
+        on_conflict="user_id,chapter_id",
+    ).execute()
+
+
+# ── Fix 2 : get_or_create_exercises — retire la double vérification du cache
+
+
+@staticmethod
+async def get_or_create_exercises(
+    chapter_id: str,
+    user_id: str,
+    count: int = 5,
+    types: Optional[list[str]] = None,
+) -> list:
+    chapter, project_id = ChapterService.get_chapter_with_project(chapter_id, user_id)
+    # ✅ Pas de cache check ici — generate_exercises() le fait déjà
+    return await generate_exercises(
+        chapter_id=chapter_id,
+        project_id=project_id,
+        count=count,
+        types=types,
+    )
+
+
+# ── Fix 3 : build_chat_messages — gap detection avant Tavily ──────────────
+
+
+@staticmethod
+async def build_chat_messages(
+    chapter_id: str,
+    user_id: str,
+    message: str,
+    history: list,
+) -> list[dict]:
+    chapter, project_id = ChapterService.get_chapter_with_project(chapter_id, user_id)
+    chapter_title = chapter["title"]
+
+    rewritten_query = await rewrite_query(
+        user_question=message,
+        chapter_context=chapter_title,
+    )
+
+    # ✅ Importe le gap detector pour décision intelligente
+    from app.rag.gap_detector import enrich_if_needed
+
+    rag_chunks, web_sources, web_was_used = await enrich_if_needed(
+        query=rewritten_query,
+        project_id=project_id,
+        chapter_hint=chapter_title,
+        top_k=3,
+        context_label="chat",
+    )
+
+    rag_context = (
+        "\n\n".join(
+            f"[Doc chunk {i+1} — score {c.get('similarity', 0):.2f}]: {c.get('content', '')[:800]}"
+            for i, c in enumerate(rag_chunks)
+        )
+        or "No relevant content found in your documents."
+    )
+
+    web_context = ""
+    if web_was_used and web_sources:
+        web_context = "\n\n".join(
+            f"[Web: {s.get('title', '')}] {s.get('content', '')[:500]} ({s.get('url', '')})"
+            for s in web_sources[:2]
+        )
+
+    context_block = (
+        f"Current chapter: {chapter_title}\n"
+        f"Objective: {chapter.get('objective', '')}\n\n"
+        f"--- Content from YOUR study materials ---\n{rag_context}"
+        + (
+            f"\n\n--- Supplementary web sources ---\n{web_context}"
+            if web_context
+            else ""
+        )
+    )
+
+    recent_history = history[-6:]
+    return [
+        {"role": "system", "content": TUTOR_SYSTEM_PROMPT},
+        {"role": "user", "content": f"[Context]\n{context_block}"},
+        *[{"role": m.role, "content": m.content} for m in recent_history],
+        {"role": "user", "content": message},
+    ]
