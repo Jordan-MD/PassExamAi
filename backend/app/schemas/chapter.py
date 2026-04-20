@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Literal, List
-from app.schemas.lesson import LessonSchema
+from typing import Optional, Literal
 import uuid
 
 ChapterStatus = Literal["locked", "available", "in_progress", "completed"]

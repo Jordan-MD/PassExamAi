@@ -2,7 +2,6 @@ import logging
 from app.rag.retrieval import retrieve_chunks, assess_rag_quality
 from app.web.tavily_client import tavily_search
 from app.web.firecrawl_client import firecrawl_scrape
-from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -15,18 +14,14 @@ async def enrich_if_needed(
     context_label: str = "generation",
 ) -> tuple[list[dict], list[dict], bool]:
     """
-    Intelligence centrale du RAG hybride.
+    RAG hybride intelligent.
 
-    1. Récupère d'abord les chunks de l'utilisateur (RAG offline)
-    2. Évalue la qualité : suffisant ? → retourne directement
-    3. Insuffisant → web search ciblé pour combler les lacunes
+    1. Cherche dans les sources de l'utilisateur (RAG offline)
+    2. Évalue la qualité des résultats
+    3. Si insuffisant → web search ciblé
 
     Retourne : (rag_chunks, web_sources, web_was_used)
-
-    Principe : les sources de l'utilisateur sont TOUJOURS prioritaires.
-    Le web est un complément, jamais un substitut.
     """
-    # ── 1. RAG principal (sources utilisateur) ─────────────
     rag_chunks = await retrieve_chunks(
         query=query,
         project_id=project_id,
@@ -36,73 +31,80 @@ async def enrich_if_needed(
 
     is_sufficient, avg_sim = assess_rag_quality(rag_chunks)
 
-    # ── 2. Si suffisant, pas besoin du web ─────────────────
     if is_sufficient:
-        logger.info(
-            f"[{context_label}] RAG suffisant (avg_sim={avg_sim:.3f}) — pas de web search"
-        )
+        logger.info("[%s] RAG suffisant (avg_sim=%.3f) — skip web search", context_label, avg_sim)
         return rag_chunks, [], False
 
-    # ── 3. RAG insuffisant → web search ciblé ──────────────
     logger.info(
-        f"[{context_label}] RAG insuffisant (avg_sim={avg_sim:.3f}) → "
-        f"web search pour combler les lacunes"
+        "[%s] RAG insuffisant (avg_sim=%.3f, %d chunks) → web search ciblé",
+        context_label, avg_sim, len(rag_chunks),
     )
 
-    web_sources = await _targeted_web_search(query, rag_chunks)
+    web_sources = await _targeted_web_search(query, rag_chunks, context_label)
     return rag_chunks, web_sources, True
 
 
 async def _targeted_web_search(
     query: str,
     existing_chunks: list[dict],
+    context_label: str = "generation",
 ) -> list[dict]:
     """
-    Recherche web ciblée sur les lacunes identifiées dans le RAG.
-    Utilise le contenu existant pour affiner la requête.
+    Recherche web ciblée sur les lacunes du RAG.
+    La requête est enrichie avec ce que le RAG a déjà trouvé
+    pour ne pas chercher ce qu'on a, mais ce qui manque.
     """
-    # Construit une requête enrichie depuis ce qu'on a déjà
-    existing_context = " ".join(c.get("content", "")[:100] for c in existing_chunks[:2])
+    # ✅ existing_context utilisé pour affiner la requête (était calculé mais ignoré)
+    existing_summary = " ".join(
+        c.get("content", "")[:80] for c in existing_chunks[:2]
+    ).strip()
 
-    search_query = query
-    if existing_context:
-        # La requête web cherche ce qui MANQUE dans les sources existantes
-        search_query = f"{query} detailed explanation examples"
+    if existing_summary:
+        # On cherche ce qui COMPLÈTE le contenu partiel déjà trouvé
+        search_query = f"{query} — detailed explanation with examples and worked problems"
+    else:
+        # Aucun contexte → recherche directe
+        search_query = f"{query} study guide explanation examples"
+
+    # ✅ search_depth adapté au contexte
+    # "advanced" pour génération de contenu, "basic" pour chat interactif
+    search_depth = "basic" if context_label == "chat" else "advanced"
 
     try:
         results = await tavily_search(
             query=search_query,
             max_results=3,
-            search_depth="advanced",
+            search_depth=search_depth,
         )
 
         if not results:
             return []
 
-        # Crawle seulement la meilleure URL pour plus de profondeur
-        best_url = results[0].get("url", "")
-        enriched_sources = []
+        enriched_sources = [
+            {
+                "url": r.get("url", ""),
+                "title": r.get("title", ""),
+                "content": r.get("content", ""),
+                "source": "tavily",
+            }
+            for r in results
+        ]
 
-        for r in results:
-            enriched_sources.append(
-                {
-                    "url": r.get("url", ""),
-                    "title": r.get("title", ""),
-                    "content": r.get("content", ""),
-                    "source": "tavily",
-                }
-            )
+        # Deep crawl uniquement pour la génération (trop lent pour le chat)
+        if context_label != "chat" and results:
+            best_url = results[0].get("url", "")
+            if best_url:
+                deep_content = await firecrawl_scrape(best_url, max_chars=6000)
+                if deep_content:
+                    enriched_sources[0]["content"] = deep_content
+                    enriched_sources[0]["source"] = "firecrawl"
 
-        # Deep crawl de la meilleure source
-        if best_url:
-            deep_content = await firecrawl_scrape(best_url, max_chars=6000)
-            if deep_content:
-                enriched_sources[0]["content"] = deep_content
-                enriched_sources[0]["source"] = "firecrawl"
-
-        logger.info(f"Web enrichment ciblé: {len(enriched_sources)} sources récupérées")
+        logger.info(
+            "[%s] Web enrichment: %d sources (query='%s')",
+            context_label, len(enriched_sources), search_query[:60],
+        )
         return enriched_sources
 
     except Exception as e:
-        logger.warning(f"Web fallback search failed: {e}")
+        logger.warning("[%s] Web fallback failed: %s", context_label, e)
         return []

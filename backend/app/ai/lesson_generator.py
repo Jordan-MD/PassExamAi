@@ -199,4 +199,5 @@ def _db_to_lesson_schema(row: dict) -> LessonSchema:
         content=row["content"],
         examples=[ExampleSchema(**e) for e in (row.get("examples") or [])],
         source_references=[SourceReference(**r) for r in (row.get("source_references") or [])],
+        visual_aids_description=row.get("visual_aids_description"),
     )

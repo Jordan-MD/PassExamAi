@@ -12,23 +12,6 @@ from app.schemas.documents import DocumentChunk
 
 logger = logging.getLogger(__name__)
 
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
-    # region agent log
-    try:
-        with open("/home/bedane/dev/Projects AI/passexamai/.cursor/debug-a1f71d.log", "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "sessionId": "a1f71d",
-                "runId": "run1",
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "message": message,
-                "data": data,
-                "timestamp": int(time.time() * 1000),
-            }, ensure_ascii=True) + "\n")
-    except Exception:
-        pass
-    # endregion
-
 
 # ─────────────────────────────────────────────
 # 1. Parsing PDF
@@ -62,12 +45,12 @@ async def _download_pdf_bytes_from_supabase(storage_url: str) -> bytes:
     logger.info(f"✅ PDF téléchargé depuis Supabase: {len(response)} bytes")
     return response
 
-
-async def parse_pdf_llamaparse(storage_url: str) -> str:
+async def parse_pdf_llamaparse(pdf_bytes: bytes) -> str:
     """
-    Parse le PDF via LlamaParse (meilleure qualité : OCR, tableaux, formules).
-    Utilisé en première priorité si LlamaParse est accessible.
+    Parse via LlamaParse à partir des bytes du PDF.
+    LlamaParse n'accepte pas les URLs signées Supabase — on lui passe les bytes.
     """
+    import tempfile, os
     from llama_parse import LlamaParse
 
     parser = LlamaParse(
@@ -75,7 +58,7 @@ async def parse_pdf_llamaparse(storage_url: str) -> str:
         result_type="markdown",
         verbose=False,
         language="en",
-        system_prompt=(
+        parsing_instruction=(   # ✅ "parsing_instruction" pas "system_prompt"
             "Extract all text content. "
             "Preserve section titles and structure. "
             "Convert tables to markdown format. "
@@ -83,14 +66,20 @@ async def parse_pdf_llamaparse(storage_url: str) -> str:
         ),
     )
 
-    documents = await parser.aload_data(storage_url)
+    # LlamaParse attend un fichier — on écrit dans un temp file
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(pdf_bytes)
+        tmp_path = tmp.name
 
-    if not documents:
-        raise ValueError("LlamaParse n'a retourné aucun contenu")
-
-    full_text = "\n\n".join(doc.text for doc in documents if doc.text)
-    logger.info(f"LlamaParse OK — {len(full_text)} caractères extraits")
-    return full_text
+    try:
+        documents = await parser.aload_data(tmp_path)
+        if not documents:
+            raise ValueError("LlamaParse n'a retourné aucun contenu")
+        full_text = "\n\n".join(doc.text for doc in documents if doc.text)
+        logger.info(f"LlamaParse OK — {len(full_text)} caractères extraits")
+        return full_text
+    finally:
+        os.unlink(tmp_path)  # Nettoyage du fichier temporaire
 
 
 def parse_pdf_pymupdf(pdf_bytes: bytes) -> str:
@@ -113,28 +102,19 @@ def parse_pdf_pymupdf(pdf_bytes: bytes) -> str:
 
 async def parse_pdf(storage_url: str) -> str:
     """
-    Stratégie de parsing avec fallback automatique :
-    1. Tente LlamaParse (meilleure qualité)
-    2. Si échec → télécharge via Supabase service-role + PyMuPDF (toujours dispo)
+    Stratégie avec fallback :
+    1. Télécharge les bytes via Supabase service-role
+    2. Tente LlamaParse (meilleure qualité)
+    3. Fallback PyMuPDF (toujours disponible)
     """
-    # Tentative LlamaParse
-    try:
-        return await parse_pdf_llamaparse(storage_url)
-    except Exception as e:
-        logger.warning(
-            f"LlamaParse indisponible ({type(e).__name__}: {e}) "
-            f"→ Fallback PyMuPDF via Supabase storage"
-        )
+    # Téléchargement UNIQUE — les deux parsers utilisent les mêmes bytes
+    pdf_bytes = await _download_pdf_bytes_from_supabase(storage_url)
 
-    # Fallback robuste : download via Supabase service-role
     try:
-        pdf_bytes = await _download_pdf_bytes_from_supabase(storage_url)
-        return parse_pdf_pymupdf(pdf_bytes)
+        return await parse_pdf_llamaparse(pdf_bytes)
     except Exception as e:
-        logger.error(f"Fallback PyMuPDF aussi en échec: {e}")
-        raise RuntimeError(
-            f"Impossible de parser le PDF (LlamaParse + PyMuPDF ont échoué): {e}"
-        )
+        logger.warning(f"LlamaParse failed ({type(e).__name__}) → fallback PyMuPDF")
+        return parse_pdf_pymupdf(pdf_bytes)
 
 
 # ─────────────────────────────────────────────

@@ -1,7 +1,7 @@
-from app.db.supabase_client import supabase
-from app.rag.embeddings import get_query_embedding  # ← task_type query
-from app.core.config import settings
 import logging
+from app.db.supabase_client import supabase
+from app.rag.embeddings import get_query_embedding
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -13,20 +13,15 @@ async def retrieve_chunks(
     top_k: int | None = None,
     min_similarity: float | None = None,
 ) -> list[dict]:
-    """
-    Recherche sémantique dans pgvector.
-    Retourne : [{content, metadata, similarity}, ...]
-    similarity : 0.0 (pas du tout pertinent) → 1.0 (identique)
-    """
-    k = top_k or settings.top_k_retrieval
-    threshold = min_similarity  # None = pas de filtre
 
-    # Embedding de la requête avec task_type='retrieval_query'
+    k = top_k or settings.top_k_retrieval
+    threshold = min_similarity
+
+    # ✅ task="retrieval.query" — différent du stockage → précision asymétrique Jina v3
     query_vector = await get_query_embedding(query)
 
+    # Seul filtre fiable : project_id (isolement des données par utilisateur)
     metadata_filter: dict = {"project_id": project_id}
-    if chapter_hint:
-        metadata_filter["chapter_hint"] = chapter_hint
 
     try:
         response = supabase.rpc(
@@ -38,15 +33,14 @@ async def retrieve_chunks(
             },
         ).execute()
 
-        chunks = response.data or []
+        chunks: list[dict] = response.data or []
 
-        # Filtre par seuil de similarité si demandé
         if threshold is not None:
             chunks = [c for c in chunks if c.get("similarity", 0) >= threshold]
 
         logger.info(
-            f"Retrieval '{query[:40]}...' → "
-            f"{len(chunks)} chunks (seuil={threshold})"
+            "Retrieval '%s' → %d chunks (project=%s, seuil=%s)",
+            query[:50], len(chunks), project_id[:8], threshold,
         )
         return chunks
 
@@ -57,10 +51,8 @@ async def retrieve_chunks(
 
 def assess_rag_quality(chunks: list[dict]) -> tuple[bool, float]:
     """
-    Évalue si les chunks RAG sont suffisants pour répondre.
-    Retourne : (is_sufficient, avg_similarity)
-
-    Utilisé par le tuteur chat pour décider si web search est nécessaire.
+    Évalue si les chunks RAG sont suffisants pour répondre sans web search.
+    Retourne (is_sufficient, avg_similarity).
     """
     if not chunks:
         return False, 0.0
@@ -69,18 +61,15 @@ def assess_rag_quality(chunks: list[dict]) -> tuple[bool, float]:
     avg_sim = sum(similarities) / len(similarities)
     top_sim = max(similarities)
 
-    # Critères de suffisance :
-    # 1. Au moins N chunks trouvés
-    # 2. Le meilleur chunk dépasse le seuil
     is_sufficient = (
         len(chunks) >= settings.rag_min_chunks_threshold
         and top_sim >= settings.rag_similarity_threshold
     )
 
     logger.info(
-        f"RAG quality: {len(chunks)} chunks, "
-        f"avg_sim={avg_sim:.3f}, top_sim={top_sim:.3f} → "
-        f"{'✅ sufficient' if is_sufficient else '⚠️ insufficient → web fallback'}"
+        "RAG quality: %d chunks | avg=%.3f | top=%.3f → %s",
+        len(chunks), avg_sim, top_sim,
+        "✅ sufficient" if is_sufficient else "⚠️ insufficient → web fallback",
     )
     return is_sufficient, avg_sim
 
@@ -90,10 +79,17 @@ async def retrieve_for_chapter(
     project_id: str,
     top_k: int = 5,
 ) -> list[dict]:
-    query = f"Content related to: {chapter_title}"
+    """
+    Récupère les chunks pertinents pour un chapitre.
+    Utilisé par lesson_generator, exercise_generator et exam_generator.
+    """
+    # ✅ Requête enrichie — "Content related to:" est du bruit pour le modèle d'embedding
+    query = (
+        f"{chapter_title} — key concepts, definitions, formulas, "
+        f"examples and exam questions"
+    )
     return await retrieve_chunks(
         query=query,
         project_id=project_id,
-        chapter_hint=chapter_title,
         top_k=top_k,
     )

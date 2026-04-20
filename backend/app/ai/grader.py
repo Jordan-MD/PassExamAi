@@ -2,7 +2,7 @@ import json
 import logging
 from app.ai.llm_client import llm_complete
 from app.db.supabase_client import supabase
-from app.schemas.exercise import GradingResult, ExerciseSchema, MCQOption, RubricStep
+from app.schemas.exercise import GradingResult
 
 logger = logging.getLogger(__name__)
 

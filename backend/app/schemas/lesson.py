@@ -25,4 +25,4 @@ class LessonSchema(BaseModel):
     
     
 class LessonRequest(BaseModel):
-    use_web_enrichment: bool = True
+    use_web_enrichment: bool = False

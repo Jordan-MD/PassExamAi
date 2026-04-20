@@ -325,7 +325,6 @@ def _save_roadmap_to_db(
         {
             "id": roadmap_id,
             "project_id": project_id,
-            "user_id": user_id,
             "title": roadmap.title,
             "status": "ready",
             "doc_content_hash": content_hash,
