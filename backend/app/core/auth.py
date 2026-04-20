@@ -1,46 +1,80 @@
 import logging
-from functools import lru_cache
 from typing import Optional
 
+import jwt as pyjwt
+from jwt import PyJWKClient, ExpiredSignatureError, InvalidTokenError
 from fastapi import HTTPException, Security, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import ExpiredSignatureError, JWTError, jwt
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 security = HTTPBearer(auto_error=True)
 
+# ── JWKS client : récupère la clé publique Supabase une fois, la cache ──────
+# Fonctionne pour ES256 (nouveaux projets) ET HS256 (anciens projets)
+_jwks_client: Optional[PyJWKClient] = None
+
+def _get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        jwks_url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+        logger.info(f"Initialisation JWKS client → {jwks_url}")
+        _jwks_client = PyJWKClient(jwks_url, cache_keys=True)
+    return _jwks_client
+
 
 def _decode_supabase_token(token: str) -> dict:
     """
-    Décode et vérifie un JWT Supabase localement.
+    Décode un JWT Supabase via JWKS (ES256) avec fallback HS256.
     
-    Utilise le SUPABASE_JWT_SECRET (HMAC HS256).
-    Vérifie : signature, expiration, audience.
-    
-    Retourne le payload si valide, lève HTTPException sinon.
+    Supabase nouveaux projets → ES256, clé publique via JWKS endpoint
+    Supabase anciens projets  → HS256, secret symétrique
     """
+    # ── Tentative 1 : ES256 via JWKS (nouveaux projets Supabase) ────────────
     try:
-        payload = jwt.decode(
+        client = _get_jwks_client()
+        signing_key = client.get_signing_key_from_jwt(token)
+        payload = pyjwt.decode(
             token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            # Supabase émet les user tokens avec audience "authenticated"
-            options={"verify_aud": True},
+            signing_key.key,
+            algorithms=["ES256", "RS256"],
             audience="authenticated",
+            options={"verify_exp": True},
         )
+        logger.debug(f"Token validé via JWKS — sub={payload.get('sub', '?')}")
         return payload
 
     except ExpiredSignatureError:
-        logger.info("Token expiré reçu")
+        logger.info("Token expiré")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token expiré. Reconnectez-vous.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    except JWTError as e:
-        logger.warning(f"Token JWT invalide : {e}")
+    except Exception as jwks_error:
+        logger.debug(f"JWKS échoué ({type(jwks_error).__name__}), tentative HS256...")
+
+    # ── Tentative 2 : HS256 via secret local (anciens projets) ──────────────
+    try:
+        payload = pyjwt.decode(
+            token,
+            settings.supabase_jwt_secret,
+            algorithms=["HS256"],
+            audience="authenticated",
+            options={"verify_exp": True},
+        )
+        logger.debug(f"Token validé via HS256 — sub={payload.get('sub', '?')}")
+        return payload
+
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token expiré. Reconnectez-vous.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except InvalidTokenError as e:
+        logger.warning(f"Token invalide (HS256 + JWKS tous les deux échoués) : {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token invalide.",
@@ -51,15 +85,6 @@ def _decode_supabase_token(token: str) -> dict:
 def get_user_from_token(
     credentials: HTTPAuthorizationCredentials = Security(security),
 ) -> dict:
-    """
-    Dependency FastAPI — vérifie le token et retourne l'utilisateur.
-    
-    Usage dans les routes :
-        current_user: dict = Depends(get_user_from_token)
-    
-    Retourne :
-        {"user_id": "uuid", "email": "user@example.com", "role": "authenticated"}
-    """
     payload = _decode_supabase_token(credentials.credentials)
 
     user_id: Optional[str] = payload.get("sub")
@@ -76,6 +101,4 @@ def get_user_from_token(
     }
 
 
-# Alias pour rétrocompatibilité avec le reste du codebase
-# (tous les fichiers qui importent verify_supabase_jwt continuent de fonctionner)
 verify_supabase_jwt = get_user_from_token
