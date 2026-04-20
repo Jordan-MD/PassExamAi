@@ -24,7 +24,7 @@ async def generate_roadmap_endpoint(
             user_id=current_user["user_id"],
         )
     except PermissionError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:

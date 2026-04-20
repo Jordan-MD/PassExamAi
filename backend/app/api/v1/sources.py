@@ -107,9 +107,24 @@ async def get_source_status(
     current_user: dict = Depends(get_current_user),
 ):
     result = (
-        supabase.table("user_sources").select("*")
-        .eq("id", str(source_id)).single().execute()
+        supabase.table("user_sources")
+        .select("*, project_id")
+        .eq("id", str(source_id))
+        .single()
+        .execute()
     )
     if not result.data:
         raise HTTPException(status_code=404, detail="Source introuvable")
+
+    project = (
+        supabase.table("projects")
+        .select("id")
+        .eq("id", result.data["project_id"])
+        .eq("user_id", current_user["user_id"])
+        .single()
+        .execute()
+    )
+    if not project.data:
+        raise HTTPException(status_code=403, detail="Accès refusé")
+
     return result.data
