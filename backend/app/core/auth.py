@@ -38,9 +38,8 @@ def _decode_supabase_token(token: str) -> dict:
         payload = pyjwt.decode(
             token,
             signing_key.key,
-            algorithms=["ES256", "RS256"],
-            audience="authenticated",
-            options={"verify_exp": True},
+            algorithms=["ES256"],
+            options={"verify_exp": True, "verify_aud": False},
         )
         logger.debug(f"Token validé via JWKS — sub={payload.get('sub', '?')}")
         return payload
@@ -53,33 +52,7 @@ def _decode_supabase_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
     except Exception as jwks_error:
-        logger.debug(f"JWKS échoué ({type(jwks_error).__name__}), tentative HS256...")
-
-    # ── Tentative 2 : HS256 via secret local (anciens projets) ──────────────
-    try:
-        payload = pyjwt.decode(
-            token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
-            audience="authenticated",
-            options={"verify_exp": True},
-        )
-        logger.debug(f"Token validé via HS256 — sub={payload.get('sub', '?')}")
-        return payload
-
-    except ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token expiré. Reconnectez-vous.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except InvalidTokenError as e:
-        logger.warning(f"Token invalide (HS256 + JWKS tous les deux échoués) : {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token invalide.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        logger.debug(f"JWKS échoué ({type(jwks_error).__name__})")
 
 
 def get_user_from_token(
@@ -99,6 +72,3 @@ def get_user_from_token(
         "email": payload.get("email", ""),
         "role": payload.get("role", "authenticated"),
     }
-
-
-verify_supabase_jwt = get_user_from_token

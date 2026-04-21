@@ -112,10 +112,10 @@ def _get_cached_roadmap(project_id: str, content_hash: str) -> Optional[dict]:
         .eq("project_id", project_id)
         .eq("doc_content_hash", content_hash)
         .eq("status", "ready")
-        .single()
+        .limit(1)
         .execute()
     )
-    return result.data if result.data else None
+    return result.data[0] if result.data else None
 
 
 # ─────────────────────────────────────────────
@@ -325,6 +325,7 @@ def _save_roadmap_to_db(
         {
             "id": roadmap_id,
             "project_id": project_id,
+            "user_id": user_id,
             "title": roadmap.title,
             "status": "ready",
             "doc_content_hash": content_hash,

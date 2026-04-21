@@ -58,7 +58,7 @@ async def parse_pdf_llamaparse(pdf_bytes: bytes) -> str:
         result_type="markdown",
         verbose=False,
         language="en",
-        parsing_instruction=(   # ✅ "parsing_instruction" pas "system_prompt"
+        system_prompt=(   # ✅ "parsing_instruction" pas "system_prompt"
             "Extract all text content. "
             "Preserve section titles and structure. "
             "Convert tables to markdown format. "
@@ -197,12 +197,6 @@ async def run_ingestion_pipeline(
     Lancé en BackgroundTask — non bloquant.
     """
     logger.info(f"🚀 Ingestion démarrée: document_id={document_id}, file={filename}")
-    _debug_log("H5", "ingestion.py:223", "run_ingestion_pipeline_start", {
-        "document_id": document_id,
-        "project_id": project_id,
-        "source_type": source_type,
-        "filename_len": len(filename),
-    })
 
     try:
         # ── ÉTAPE 1 : Parsing ──────────────────────────────
@@ -220,10 +214,7 @@ async def run_ingestion_pipeline(
         # Business rule: the reference exam is only used to build roadmap prompts.
         # It does not need vectorization and should bypass embedding/pgvector steps.
         if source_type == "exam":
-            _debug_log("H5", "ingestion.py:252", "run_ingestion_pipeline_exam_bypass_embeddings", {
-                "document_id": document_id,
-                "source_type": source_type,
-            })
+
             update_document_status(document_id, "ready", chunks_count=0)
             logger.info(f"✅ Ingestion terminée (exam sans embedding): {document_id}")
             return
@@ -246,10 +237,7 @@ async def run_ingestion_pipeline(
 
         # ── ÉTAPE 3 : Embeddings ───────────────────────────
         update_document_status(document_id, "embedding")
-        _debug_log("H4", "ingestion.py:257", "run_ingestion_pipeline_before_embeddings", {
-            "document_id": document_id,
-            "chunks_count": len(chunks),
-        })
+
         embedded_chunks = await embed_chunks(chunks)
 
         # ── ÉTAPE 4 : Stockage pgvector ────────────────────
@@ -267,9 +255,7 @@ async def run_ingestion_pipeline(
     except Exception as e:
         error_msg = str(e)
         logger.error(f"❌ Ingestion échouée pour {document_id}: {error_msg}")
-        _debug_log("H4", "ingestion.py:275", "run_ingestion_pipeline_failed", {
-            "document_id": document_id,
-            "exc_type": type(e).__name__,
-            "error": error_msg[:300],
-        })
+
         update_document_status(document_id, "failed", error_message=error_msg)
+
+parsing_instruction = ""

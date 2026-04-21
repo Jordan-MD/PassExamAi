@@ -1,14 +1,11 @@
 import asyncio
 import logging
 from firecrawl import FirecrawlApp
-
 from app.core.config import settings
 from app.web.tavily_client import tavily_search
 
 logger = logging.getLogger(__name__)
-
-# ── Singleton client (thread-safe en lecture) ──────────────────────────────
-_client: FirecrawlApp | None = None  # ✅ déclaré au niveau module
+_client: FirecrawlApp | None = None
 
 
 def get_firecrawl_client() -> FirecrawlApp:
@@ -17,33 +14,28 @@ def get_firecrawl_client() -> FirecrawlApp:
         _client = FirecrawlApp(api_key=settings.firecrawl_api_key)
     return _client
 
-
 async def firecrawl_scrape(url: str, max_chars: int = 8000) -> str:
-    """
-    Extrait le contenu Markdown propre d'une URL.
-    Utilise asyncio.to_thread() pour ne pas bloquer l'event loop (SDK sync).
-
-    Retourne le contenu tronqué à max_chars, ou "" si échec.
-    """
     client = get_firecrawl_client()
     try:
-        # ✅ asyncio.to_thread() — remplace get_event_loop() déprécié en 3.10+
-        result = await asyncio.to_thread(
-            client.scrape_url,
-            url,
-            formats=["markdown"],
-            only_main_content=True,
-        )
-        content: str = result.get("markdown", "") or ""
-        truncated = content[:max_chars]
-        logger.info(
-            f"Firecrawl scrape '{url[:60]}' → {len(truncated)}/{len(content)} chars"
-        )
-        return truncated
+        def _do_scrape():
+            if hasattr(client, "scrape"):
+                return client.scrape(url, formats=["markdown"])
+            else:
+                # Fallback si le SDK est instancié différemment
+                raise AttributeError("Le client Firecrawl ne possède ni 'scrape_url' ni 'scrape'")
+
+        result = await asyncio.to_thread(_do_scrape)
+        
+        content = ""
+        if result and isinstance(result, dict):
+            # Selon la version, le markdown est à la racine ou dans 'data'
+            content = result.get("markdown") or result.get("data", {}).get("markdown", "")
+        
+        return content[:max_chars] if content else ""
 
     except Exception as e:
-        logger.warning(f"Firecrawl error for '{url}': {e}")
-        return ""  # ✅ toujours str, jamais None
+        logger.error(f"Firecrawl Error for {url}: {srt(e)}")
+        return ""
 
 
 async def enrich_with_web(
@@ -52,20 +44,12 @@ async def enrich_with_web(
     search_depth: str = "advanced",
 ) -> list[dict]:
     """
-    Pipeline d'enrichissement web hybride :
-    1. Tavily search → snippets rapides pour toutes les queries
-    2. Firecrawl deep crawl → contenu complet sur les N meilleures URLs
-
-    Retourne : [{url, title, content, source: 'tavily'|'firecrawl'}]
-
-    Utilisé par roadmap_generator et lesson_generator (enrichissement offline).
-    Pour le chat, utiliser gap_detector.enrich_if_needed() à la place.
+    Pipeline d'enrichissement web : Tavily pour la recherche, Firecrawl pour le contenu profond.
     """
     all_sources: list[dict] = []
     seen_urls: set[str] = set()
 
-    # ── 1. Tavily search pour chaque query ──────────────────────────────────
-    # On lance toutes les recherches en parallèle
+    # 1. Recherche Tavily (Rapide)
     search_tasks = [
         tavily_search(query=q, max_results=3, search_depth=search_depth)
         for q in queries
@@ -74,36 +58,30 @@ async def enrich_with_web(
 
     for results in search_results:
         if isinstance(results, Exception):
-            logger.warning(f"Tavily search failed: {results}")
             continue
         for r in results:
-            url = r.get("url", "")
+            url = r.get("url")
             if not url or url in seen_urls:
                 continue
             seen_urls.add(url)
             all_sources.append({
                 "url": url,
-                "title": r.get("title", ""),
+                "title": r.get("title", "Sans titre"),
                 "content": r.get("content", ""),
                 "source": "tavily",
             })
 
-    # ── 2. Firecrawl deep crawl sur les N meilleures URLs ──────────────────
+    # 2. Scraping Firecrawl (Profond) sur les meilleures URLs
     urls_to_crawl = list(seen_urls)[:max_urls_to_crawl]
-
     crawl_tasks = [firecrawl_scrape(url) for url in urls_to_crawl]
     crawl_results = await asyncio.gather(*crawl_tasks)
 
-    url_to_content = dict(zip(urls_to_crawl, crawl_results))
-
+    # Mise à jour des sources avec le contenu Markdown complet
+    url_map = dict(zip(urls_to_crawl, crawl_results))
     for source in all_sources:
-        deep = url_to_content.get(source["url"])
-        if deep:
-            source["content"] = deep
+        deep_content = url_map.get(source["url"])
+        if deep_content:
+            source["content"] = deep_content
             source["source"] = "firecrawl"
 
-    logger.info(
-        f"Web enrichment: {len(all_sources)} sources "
-        f"({len(urls_to_crawl)} crawlées via Firecrawl)"
-    )
     return all_sources
