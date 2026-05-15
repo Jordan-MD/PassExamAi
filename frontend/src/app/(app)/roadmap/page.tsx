@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { roadmapApi, documentsApi } from "@/lib/api";
 import type { Roadmap, Chapter, UploadedDocument } from "@/types";
@@ -12,7 +12,7 @@ const statusColors: Record<string, string> = {
   locked: "roadmap-node-locked",
 };
 
-export default function RoadmapPage() {
+function RoadmapContent() {
   const params = useSearchParams();
   const router = useRouter();
   const projectId = params.get("projectId") || "";
@@ -264,5 +264,17 @@ function ChapterRow({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RoadmapPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    }>
+      <RoadmapContent />
+    </Suspense>
   );
 }

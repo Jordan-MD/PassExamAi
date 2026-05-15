@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { examApi } from "@/lib/api";
 import type { Exam, ExamResult } from "@/types";
 import Icon from "@/components/ui/Icon";
 
-export default function ExamPage() {
+function ExamContent() {
   const params = useSearchParams();
   const router = useRouter();
   const roadmapId = params.get("roadmapId") || "";
@@ -303,5 +303,18 @@ function ResultView({ result, onBack }: { result: ExamResult; onBack: () => void
         </button>
       </div>
     </div>
+  );
+}
+
+
+export default function ExamPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    }>
+      <ExamContent />
+    </Suspense>
   );
 }

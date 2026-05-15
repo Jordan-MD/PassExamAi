@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Icon from "@/components/ui/Icon";
 
@@ -29,7 +29,7 @@ function ScoreRingSmall({ score }: { score: number }) {
   );
 }
 
-export default function ResultsPage() {
+function ResultsContent() {
   const params = useSearchParams();
   const router = useRouter();
 
@@ -106,5 +106,17 @@ export default function ResultsPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    }>
+      <ResultsContent />
+    </Suspense>
   );
 }

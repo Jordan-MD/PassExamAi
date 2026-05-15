@@ -1,11 +1,11 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { progressApi, projectsApi } from "@/lib/api";
 import type { ProjectProgress, Project } from "@/types";
 import Icon from "@/components/ui/Icon";
 
-export default function ProgressPage() {
+function ProgressContent() {
   const params = useSearchParams();
   const router = useRouter();
   const projectId = params.get("projectId") || "";
@@ -166,5 +166,17 @@ export default function ProgressPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function ProgressPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    }>
+      <ProgressContent />
+    </Suspense>
   );
 }
